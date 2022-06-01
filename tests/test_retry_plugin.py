@@ -235,3 +235,22 @@ def test_retry_delay_from_command_line_between_attempts(testdir):
 
     assert_outcomes(result, passed=1, retried=1)
     assert result.duration > 4
+
+
+def test_report_is_available_from_item(testdir):
+    testdir.makepyfile(
+        "def test_success(): assert 1 == 1"
+    )
+    testdir.makeconftest(
+        """
+        import pytest
+
+        @pytest.fixture(autouse=True)
+        def report_check(request):
+            yield
+            assert request.node.report.outcome == 'passed'
+        """
+    )
+    result = testdir.runpytest()
+
+    assert_outcomes(result, passed=1)

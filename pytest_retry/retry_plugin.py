@@ -98,6 +98,8 @@ def pytest_runtest_makereport(
 ) -> Generator[None, pytest.TestReport, None]:
     outcome = yield
     original_report = outcome.get_result()
+    # Attach latest report to item for easy access
+    setattr(item, 'report', original_report)
     if not should_handle_retry(original_report):
         return
     flake_mark = item.get_closest_marker("flaky")

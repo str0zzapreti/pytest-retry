@@ -1,3 +1,4 @@
+![Tests](https://github.com/str0zzapreti/pytest-retry/actions/workflows/tests.yaml/badge.svg)
 # pytest-retry
 
 pytest-retry is a plugin for Pytest which adds the ability to retry flaky tests,
@@ -115,4 +116,3 @@ test_retry_passes_after_temporary_test_failure.py R.                     [100%]
 Tests which have been retried but eventually pass are counted as both retried and
 passed, and tests which have been retried but eventually fail are counted as both
 retried and failed. Skipped, xfailed, and xpassed tests are never retried.
-

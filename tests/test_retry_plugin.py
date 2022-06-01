@@ -47,7 +47,7 @@ def test_no_retry_on_fail_without_plugin(testdir):
 
 def test_no_retry_on_skip_mark(testdir):
     testdir.makepyfile(
-        f"""
+        """
         import pytest
         @pytest.mark.skip(reason='do not run me')
         def test_skip():
@@ -61,7 +61,7 @@ def test_no_retry_on_skip_mark(testdir):
 
 def test_no_retry_on_skip_call(testdir):
     testdir.makepyfile(
-        f"""
+        """
         import pytest
         def test_skip():
             pytest.skip(reason="Don't test me")
@@ -96,6 +96,7 @@ def test_no_retry_on_xpass(testdir):
         """
     )
     result = testdir.runpytest("--retries", "1")
+
     assert_outcomes(result, passed=0, xpassed=1)
 
 
@@ -108,6 +109,7 @@ def test_retry_fails_after_consistent_setup_failure(testdir):
         """
     )
     result = testdir.runpytest("--retries", "1")
+
     assert_outcomes(result, passed=0, errors=1, retried=0)
 
 
@@ -115,7 +117,7 @@ def test_retry_fails_after_consistent_setup_failure(testdir):
 def test_retry_passes_after_temporary_setup_failure(testdir):
     testdir.makepyfile("def test_pass(): pass")
     testdir.makeconftest(
-        f"""
+        """
         a = []
         def pytest_runtest_setup(item):
             a.append(1)
@@ -123,18 +125,20 @@ def test_retry_passes_after_temporary_setup_failure(testdir):
                 raise ValueError('Setup failed!')"""
     )
     result = testdir.runpytest("--retries", "1")
+
     assert_outcomes(result, passed=1, retried=1)
 
 
 def test_retry_fails_after_consistent_test_failure(testdir):
     testdir.makepyfile("def test_fail(): assert False")
     result = testdir.runpytest("--retries", "1")
+
     assert_outcomes(result, passed=0, failed=1, retried=1)
 
 
 def test_retry_passes_after_temporary_test_failure(testdir):
     testdir.makepyfile(
-        f"""
+        """
         a = []
         def test_eventually_passes():
             a.append(1)
@@ -142,12 +146,13 @@ def test_retry_passes_after_temporary_test_failure(testdir):
         """
     )
     result = testdir.runpytest("--retries", "1")
+
     assert_outcomes(result, passed=1, retried=1)
 
 
 def test_retry_passes_after_temporary_test_failure_with_flaky_mark(testdir):
     testdir.makepyfile(
-        f"""
+        """
         import pytest
 
         a = []
@@ -159,16 +164,17 @@ def test_retry_passes_after_temporary_test_failure_with_flaky_mark(testdir):
         """
     )
     result = testdir.runpytest()
+
     assert_outcomes(result, passed=1, retried=1)
 
 
 def test_retries_if_flaky_mark_is_called_without_options(testdir):
     testdir.makepyfile(
-        f"""
+        """
         import pytest
-        
+
         a = []
-        
+
         @pytest.mark.flaky()
         def test_eventually_passes():
             a.append(1)
@@ -176,12 +182,13 @@ def test_retries_if_flaky_mark_is_called_without_options(testdir):
         """
     )
     result = testdir.runpytest()
+
     assert_outcomes(result, passed=1, retried=1)
 
 
 def test_retry_fails_if_temporary_failures_exceed_retry_limit(testdir):
     testdir.makepyfile(
-        f"""
+        """
         a = []
         def test_eventually_passes():
             a.append(1)
@@ -189,12 +196,13 @@ def test_retry_fails_if_temporary_failures_exceed_retry_limit(testdir):
         """
     )
     result = testdir.runpytest("--retries", "2")
+
     assert_outcomes(result, passed=0, failed=1, retried=1)
 
 
 def test_retry_delay_from_mark_between_attempts(testdir):
     testdir.makepyfile(
-        f"""
+        """
         import pytest
 
         a = []
@@ -213,7 +221,7 @@ def test_retry_delay_from_mark_between_attempts(testdir):
 
 def test_retry_delay_from_command_line_between_attempts(testdir):
     testdir.makepyfile(
-        f"""
+        """
         import pytest
 
         a = []

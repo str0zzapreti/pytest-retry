@@ -15,7 +15,7 @@ class RetryHandler:
 
     def __init__(self) -> None:
         self.stream = StringIO()
-        self.trace_limit = -1
+        self.trace_limit: Optional[int] = -1
 
     def log_test_retry(self, attempt: int, test_name: str, err: tuple) -> None:
         formatted_trace = (

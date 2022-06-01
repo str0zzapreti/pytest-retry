@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "pytest-retry"
+version = "1.0.0"
+description = "Adds the ability to retry flaky tests in CI environments"
+readme = "README.md"
+authors = [{ name = "str0zzapreti" }]
+license = { file = "LICENSE" }
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3 :: Only",
+    "Framework :: Pytest",
+]
+keywords = ["rerun", "pytest", "flaky"]
+dependencies = [
+    "pytest >= 7.0.0",
+]
+requires-python = ">=3.9"
+
+[project.optional-dependencies]
+dev = ["black", "isort", "mypy", "flake8"]
+
+[project.urls]
+Homepage = "https://github.com/str0zzapreti/pytest-retry"
+
+[options.entry_points]
+"pytest11" = "pytest-retry = pytest_retry.retry_plugin"
+
+[tool.mypy]
+python_version = "3.10"
+cache_dir = "/dev/null"
+disallow_untyped_defs = true

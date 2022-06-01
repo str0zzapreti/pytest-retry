@@ -1,0 +1,10 @@
+.D*
+.N*
+.idea/
+venv/
+*.egg*/
+.pytest_cache/
+artifacts/
+credentials.ini
+config.ini
+__pycache__

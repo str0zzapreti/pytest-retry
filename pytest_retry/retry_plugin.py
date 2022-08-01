@@ -108,6 +108,9 @@ def pytest_runtest_makereport(
     attempts = 1
     delay = flake_mark.kwargs.get("delay", 0)
     retries = flake_mark.kwargs.get("retries", 1)
+    timing = flake_mark.kwargs.get("timing", "overwrite")
+    if timing not in ("overwrite", "cumulative"):
+        raise ValueError(f"Unknown timing type: {timing}! Must be `cumulative` or `overwrite`.")
     hook = item.ihook
 
     while True:
@@ -159,7 +162,10 @@ def pytest_runtest_makereport(
         else:
             original_report.outcome = retry_report.outcome
             original_report.longrepr = retry_report.longrepr
-            original_report.duration += retry_report.duration
+            if timing == 'overwrite':
+                original_report.duration = retry_report.duration
+            else:
+                original_report.duration += retry_report.duration
             if retry_report.failed:
                 exc_info = (call.excinfo.type, call.excinfo.value, call.excinfo.tb)  # type: ignore
                 retry_manager.log_test_totally_failed(
@@ -212,6 +218,14 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=0,
         help="add a delay (in seconds) between retries.",
     )
+    group.addoption(
+        "--cumulative-timing",
+        action="store",
+        dest="cumulative_timing",
+        type=bool,
+        default=False,
+        help="if True, retry duration will be included in overall reported test duration",
+    )
 
 
 def pytest_collection_modifyitems(
@@ -220,7 +234,8 @@ def pytest_collection_modifyitems(
     if not config.getoption("--retries"):
         return
     retry_delay = config.getoption("--retry-delay") or 0
-    flaky = pytest.mark.flaky(retries=config.option.retries, delay=retry_delay)
+    timing = "cumulative" if config.getoption("--cumulative-timing") else "overwrite"
+    flaky = pytest.mark.flaky(retries=config.option.retries, delay=retry_delay, timing=timing)
     for item in items:
         if "flaky" not in item.keywords:
             item.add_marker(flaky)

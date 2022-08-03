@@ -101,16 +101,16 @@ def pytest_runtest_makereport(
     item: pytest.Item, call: pytest.CallInfo
 ) -> Generator[None, pytest.TestReport, None]:
     outcome = yield
-    original_report = outcome.get_result()
-    # Attach latest report to item for easy access
-
+    original_report: pytest.TestReport = outcome.get_result()
+    # Attach outcome and attempts to item. If any stage failed, the test is considered failed
+    if item.stash.get(success_key, True):
+        item.stash[success_key] = original_report.passed
     if not should_handle_retry(original_report):
         return
     flake_mark = item.get_closest_marker("flaky")
     if flake_mark is None:
         return
     item.stash[attempts_key] = 1
-    item.stash[success_key] = False
     delay = flake_mark.kwargs.get("delay", 0)
     retries = flake_mark.kwargs.get("retries", 1)
     timing = flake_mark.kwargs.get("timing", "overwrite")
@@ -143,8 +143,9 @@ def pytest_runtest_makereport(
             )
             break
 
-        if original_report.outcome == "failed":
-            original_report.outcome = "retried"
+        if item.stash[attempts_key] == 1:
+            # The test only needs to report that it is being retried the first time
+            original_report.outcome = "retried"  # type: ignore[assignment]
             item.ihook.pytest_runtest_logreport(report=original_report)
         retry_manager.log_test_retry(
             attempt=item.stash[attempts_key], test_name=item.name, err=exc_info

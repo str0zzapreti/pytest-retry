@@ -7,6 +7,10 @@ from typing import Generator, Optional
 from _pytest.terminal import TerminalReporter
 
 
+success_key = pytest.StashKey[bool]()
+attempts_key = pytest.StashKey[int]()
+
+
 class RetryHandler:
     """
     Stores statistics and reports for flaky tests and fixtures which have
@@ -97,17 +101,21 @@ def pytest_runtest_makereport(
     item: pytest.Item, call: pytest.CallInfo
 ) -> Generator[None, pytest.TestReport, None]:
     outcome = yield
-    original_report = outcome.get_result()
-    # Attach latest report to item for easy access
-    setattr(item, 'report', original_report)
+    original_report: pytest.TestReport = outcome.get_result()
+    # Attach outcome and attempts to item. If any stage failed, the test is considered failed
+    if item.stash.get(success_key, True):
+        item.stash[success_key] = original_report.passed
     if not should_handle_retry(original_report):
         return
     flake_mark = item.get_closest_marker("flaky")
     if flake_mark is None:
         return
-    attempts = 1
+    item.stash[attempts_key] = 1
     delay = flake_mark.kwargs.get("delay", 0)
     retries = flake_mark.kwargs.get("retries", 1)
+    timing = flake_mark.kwargs.get("timing", "overwrite")
+    if timing not in ("overwrite", "cumulative"):
+        raise ValueError(f"Unknown timing type: {timing}! Must be `cumulative` or `overwrite`.")
     hook = item.ihook
 
     while True:
@@ -129,16 +137,19 @@ def pytest_runtest_makereport(
         if t_call.excinfo:
             t_exc_info = (t_call.excinfo.type, t_call.excinfo.value, t_call.excinfo.tb)
             retry_manager.log_test_finalizer_failed(
-                attempt=attempts,
+                attempt=item.stash[attempts_key],
                 test_name=item.name,
                 err=t_exc_info,
             )
             break
 
-        if original_report.outcome == "failed":
-            original_report.outcome = "retried"
+        if item.stash[attempts_key] == 1:
+            # The test only needs to report that it is being retried the first time
+            original_report.outcome = "retried"  # type: ignore[assignment]
             item.ihook.pytest_runtest_logreport(report=original_report)
-        retry_manager.log_test_retry(attempt=attempts, test_name=item.name, err=exc_info)
+        retry_manager.log_test_retry(
+            attempt=item.stash[attempts_key], test_name=item.name, err=exc_info
+        )
         sleep(delay)
         # Call _initrequest(). Only way to get the setup to run again
         item._initrequest()  # type: ignore[attr-defined]
@@ -151,19 +162,22 @@ def pytest_runtest_makereport(
         if has_interactive_exception(call):
             hook.pytest_exception_interact(node=item, call=call, report=retry_report)
 
-        attempts += 1
-        should_keep_retrying = not retry_report.passed and attempts <= retries
+        item.stash[attempts_key] += 1
+        should_keep_retrying = not retry_report.passed and item.stash[attempts_key] <= retries
 
-        if should_keep_retrying:
-            continue
-        else:
+        if not should_keep_retrying:
             original_report.outcome = retry_report.outcome
             original_report.longrepr = retry_report.longrepr
-            original_report.duration += retry_report.duration
+            if timing == 'overwrite':
+                original_report.duration = retry_report.duration
+            else:
+                original_report.duration += retry_report.duration
+            item.stash[success_key] = retry_report.passed
+
             if retry_report.failed:
                 exc_info = (call.excinfo.type, call.excinfo.value, call.excinfo.tb)  # type: ignore
                 retry_manager.log_test_totally_failed(
-                    attempt=attempts, test_name=item.name, err=exc_info
+                    attempt=item.stash[attempts_key], test_name=item.name, err=exc_info
                 )
             break
 
@@ -212,6 +226,14 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=0,
         help="add a delay (in seconds) between retries.",
     )
+    group.addoption(
+        "--cumulative-timing",
+        action="store",
+        dest="cumulative_timing",
+        type=bool,
+        default=False,
+        help="if True, retry duration will be included in overall reported test duration",
+    )
 
 
 def pytest_collection_modifyitems(
@@ -220,7 +242,8 @@ def pytest_collection_modifyitems(
     if not config.getoption("--retries"):
         return
     retry_delay = config.getoption("--retry-delay") or 0
-    flaky = pytest.mark.flaky(retries=config.option.retries, delay=retry_delay)
+    timing = "cumulative" if config.getoption("--cumulative-timing") else "overwrite"
+    flaky = pytest.mark.flaky(retries=config.option.retries, delay=retry_delay, timing=timing)
     for item in items:
         if "flaky" not in item.keywords:
             item.add_marker(flaky)

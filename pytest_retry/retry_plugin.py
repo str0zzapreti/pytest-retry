@@ -7,6 +7,10 @@ from typing import Generator, Optional
 from _pytest.terminal import TerminalReporter
 
 
+success_key = pytest.StashKey[bool]()
+attempts_key = pytest.StashKey[int]()
+
+
 class RetryHandler:
     """
     Stores statistics and reports for flaky tests and fixtures which have
@@ -99,13 +103,14 @@ def pytest_runtest_makereport(
     outcome = yield
     original_report = outcome.get_result()
     # Attach latest report to item for easy access
-    setattr(item, 'report', original_report)
+
     if not should_handle_retry(original_report):
         return
     flake_mark = item.get_closest_marker("flaky")
     if flake_mark is None:
         return
-    attempts = 1
+    item.stash[attempts_key] = 1
+    item.stash[success_key] = False
     delay = flake_mark.kwargs.get("delay", 0)
     retries = flake_mark.kwargs.get("retries", 1)
     timing = flake_mark.kwargs.get("timing", "overwrite")
@@ -132,7 +137,7 @@ def pytest_runtest_makereport(
         if t_call.excinfo:
             t_exc_info = (t_call.excinfo.type, t_call.excinfo.value, t_call.excinfo.tb)
             retry_manager.log_test_finalizer_failed(
-                attempt=attempts,
+                attempt=item.stash[attempts_key],
                 test_name=item.name,
                 err=t_exc_info,
             )
@@ -141,7 +146,9 @@ def pytest_runtest_makereport(
         if original_report.outcome == "failed":
             original_report.outcome = "retried"
             item.ihook.pytest_runtest_logreport(report=original_report)
-        retry_manager.log_test_retry(attempt=attempts, test_name=item.name, err=exc_info)
+        retry_manager.log_test_retry(
+            attempt=item.stash[attempts_key], test_name=item.name, err=exc_info
+        )
         sleep(delay)
         # Call _initrequest(). Only way to get the setup to run again
         item._initrequest()  # type: ignore[attr-defined]
@@ -154,22 +161,22 @@ def pytest_runtest_makereport(
         if has_interactive_exception(call):
             hook.pytest_exception_interact(node=item, call=call, report=retry_report)
 
-        attempts += 1
-        should_keep_retrying = not retry_report.passed and attempts <= retries
+        item.stash[attempts_key] += 1
+        should_keep_retrying = not retry_report.passed and item.stash[attempts_key] <= retries
 
-        if should_keep_retrying:
-            continue
-        else:
+        if not should_keep_retrying:
             original_report.outcome = retry_report.outcome
             original_report.longrepr = retry_report.longrepr
             if timing == 'overwrite':
                 original_report.duration = retry_report.duration
             else:
                 original_report.duration += retry_report.duration
+            item.stash[success_key] = retry_report.passed
+
             if retry_report.failed:
                 exc_info = (call.excinfo.type, call.excinfo.value, call.excinfo.tb)  # type: ignore
                 retry_manager.log_test_totally_failed(
-                    attempt=attempts, test_name=item.name, err=exc_info
+                    attempt=item.stash[attempts_key], test_name=item.name, err=exc_info
                 )
             break
 

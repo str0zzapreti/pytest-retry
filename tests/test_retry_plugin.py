@@ -302,7 +302,27 @@ def test_failed_outcome_after_successful_teardown(testdir):
     assert_outcomes(result, passed=0, failed=1)
 
 
-def test_attempts_are_available_from_item_stash(testdir):
+def test_attempts_are_always_available_from_item_stash(testdir):
+    testdir.makepyfile(
+        "def test_success(): assert 1 == 1"
+    )
+    testdir.makeconftest(
+        """
+        import pytest
+        from pytest_retry import attempts_key
+
+        @pytest.fixture(autouse=True)
+        def report_check(request):
+            yield
+            assert request.node.stash[attempts_key] == 1
+        """
+    )
+    result = testdir.runpytest()
+
+    assert_outcomes(result, passed=1)
+
+
+def test_attempt_count_is_correct(testdir):
     testdir.makepyfile(
         """
         import pytest

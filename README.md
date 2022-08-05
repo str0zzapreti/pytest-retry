@@ -60,6 +60,22 @@ def test_unreliable_service():
     ...
 ```
 
+Finally, there is both a command line option and flaky mark argument for the test
+timing method, which can either be `overwrite` (default) or `cumulative`. With 
+cumulative timing, the duration of each test attempt is summed for the overall test
+duration reported at the end. The default behavior simply uses the timing for
+the final attempt. 
+
+```
+@pytest.mark.flaky(timing='overwrite')
+def test_unreliable_service():
+    ...
+```
+
+If you're not sure which to use, stick with the default `overwrite` method. This
+generally plays nicer with time-based test splitting algorithms and will result in
+more even splits. 
+
 The flaky mark will override any command line options if passed when running Pytest.
 
 ### Things to consider
@@ -93,7 +109,7 @@ output which lists all of the tests which were retried, along with the exception
 that occurred during each failed attempt. 
 
 ```
-plugins: retry-1.0.0
+plugins: retry-1.1.0
 collected 1 item
 
 test_retry_passes_after_temporary_test_failure.py R.                     [100%]
@@ -116,3 +132,10 @@ test_retry_passes_after_temporary_test_failure.py R.                     [100%]
 Tests which have been retried but eventually pass are counted as both retried and
 passed, and tests which have been retried but eventually fail are counted as both
 retried and failed. Skipped, xfailed, and xpassed tests are never retried.
+
+Two pytest stash keys are available to import from the pytest_retry plugin:
+`attempts_key` and `success_key`. These keys are used by the plugin to store the
+number of attempts each item has undergone and whether or not the test passed or
+failed, respectively. (If any stage of setup, call, or teardown fails, a test is
+considered failed overall). These stash keys can be used to retreive these reports
+for use in your own hooks or plugins.

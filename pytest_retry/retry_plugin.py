@@ -80,18 +80,15 @@ def has_interactive_exception(call: pytest.CallInfo) -> bool:
     return True
 
 
-def should_handle_retry(res: pytest.TestReport) -> bool:
+def should_handle_retry(rep: pytest.TestReport) -> bool:
     # if test passed, don't retry
-    if res.passed:
-        return False
-    # if this is the teardown stage, don't retry
-    if res.when == "teardown":
+    if rep.passed:
         return False
     # if test was skipped, don't retry
-    if res.skipped:
+    if rep.skipped:
         return False
     # if test is xfail, don't retry
-    if hasattr(res, "wasxfail"):
+    if hasattr(rep, "wasxfail"):
         return False
     return True
 
@@ -103,14 +100,15 @@ def pytest_runtest_makereport(
     outcome = yield
     original_report: pytest.TestReport = outcome.get_result()
     # Attach outcome and attempts to item. If any stage failed, the test is considered failed
-    if item.stash.get(success_key, True):
-        item.stash[success_key] = original_report.passed
+    if original_report.when == 'teardown':
+        return
+    item.stash[success_key] = original_report.passed
+    item.stash[attempts_key] = 1
     if not should_handle_retry(original_report):
         return
     flake_mark = item.get_closest_marker("flaky")
     if flake_mark is None:
         return
-    item.stash[attempts_key] = 1
     delay = flake_mark.kwargs.get("delay", 0)
     retries = flake_mark.kwargs.get("retries", 1)
     timing = flake_mark.kwargs.get("timing", "overwrite")

@@ -5,6 +5,7 @@ from io import StringIO
 from traceback import format_exception
 from typing import Generator, Optional
 from _pytest.terminal import TerminalReporter
+from _pytest.logging import caplog_records_key
 
 
 success_key = pytest.StashKey[bool]()
@@ -141,6 +142,8 @@ def pytest_runtest_makereport(
                 test_name=item.name,
                 err=t_exc_info,
             )
+            # Prevents a KeyError when an error during retry teardown causes a redundant teardown
+            item.stash[caplog_records_key] = {}  # type: ignore
             break
 
         if item.stash[attempts_key] == 1:

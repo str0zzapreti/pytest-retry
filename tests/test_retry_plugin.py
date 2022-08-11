@@ -245,12 +245,12 @@ def test_passing_outcome_is_available_from_item_stash(testdir):
     testdir.makeconftest(
         """
         import pytest
-        from pytest_retry import success_key
+        from pytest_retry import outcome_key
 
         @pytest.fixture(autouse=True)
         def report_check(request):
             yield
-            assert request.node.stash[success_key] is True
+            assert request.node.stash[outcome_key] == "passed"
         """
     )
     result = testdir.runpytest()
@@ -265,17 +265,62 @@ def test_failed_outcome_is_available_from_item_stash(testdir):
     testdir.makeconftest(
         """
         import pytest
-        from pytest_retry import success_key
+        from pytest_retry import outcome_key
 
         @pytest.fixture(autouse=True)
         def report_check(request):
             yield
-            assert request.node.stash[success_key] is False
+            assert request.node.stash[outcome_key] == "failed"
         """
     )
     result = testdir.runpytest()
 
     assert_outcomes(result, passed=0, failed=1)
+
+
+def test_skipped_outcome_is_available_from_item_stash(testdir):
+    testdir.makepyfile(
+        """
+        import pytest
+
+        @pytest.mark.skip
+        def test_success(): assert 1 == 2
+        """
+    )
+    testdir.makeconftest(
+        """
+        import pytest
+        from pytest_retry import outcome_key, attempts_key, duration_key
+
+        def pytest_sessionfinish(session: pytest.Session) -> None:
+            for item in session.items:
+                assert item.stash[outcome_key] == "skipped"
+                assert item.stash[attempts_key] == 0
+                assert item.stash[duration_key] == 0.0
+        """
+    )
+    result = testdir.runpytest()
+
+    assert_outcomes(result, passed=0, skipped=1)
+
+
+def test_duration_is_available_from_item_stash(testdir):
+    testdir.makepyfile(
+        """def test_success(): assert 1 == 1"""
+    )
+    testdir.makeconftest(
+        """
+        import pytest
+        from pytest_retry import duration_key
+
+        def pytest_sessionfinish(session: pytest.Session) -> None:
+            for item in session.items:
+                assert item.stash[duration_key] > 0
+        """
+    )
+    result = testdir.runpytest()
+
+    assert_outcomes(result, passed=1)
 
 
 def test_failed_outcome_after_successful_teardown(testdir):
@@ -285,21 +330,68 @@ def test_failed_outcome_after_successful_teardown(testdir):
     testdir.makeconftest(
         """
         import pytest
-        from pytest_retry import success_key
+        from pytest_retry import outcome_key
 
         @pytest.fixture(autouse=True)
-        def report_check(request):
+        def successful_teardown(request):
             yield
             assert 1 == 1
 
         def pytest_sessionfinish(session: pytest.Session) -> None:
             for item in session.items:
-                assert item.stash[success_key] is False
+                assert item.stash[outcome_key] == "failed"
         """
     )
     result = testdir.runpytest()
 
     assert_outcomes(result, passed=0, failed=1)
+
+
+def test_failed_outcome_after_unsuccessful_setup(testdir):
+    testdir.makepyfile(
+        "def test_success(): assert 1 == 1"
+    )
+    testdir.makeconftest(
+        """
+        import pytest
+        from pytest_retry import outcome_key
+
+        @pytest.fixture(autouse=True)
+        def failed_setup(request):
+            assert 1 == 2
+
+        def pytest_sessionfinish(session: pytest.Session) -> None:
+            for item in session.items:
+                assert item.stash[outcome_key] == "failed"
+        """
+    )
+    result = testdir.runpytest()
+
+    assert_outcomes(result, passed=0, errors=1)
+
+
+def test_failed_outcome_after_unsuccessful_teardown(testdir):
+    testdir.makepyfile(
+        "def test_success(): assert 1 == 1"
+    )
+    testdir.makeconftest(
+        """
+        import pytest
+        from pytest_retry import outcome_key
+
+        @pytest.fixture(autouse=True)
+        def failed_teardown(request):
+            yield
+            assert 1 == 2
+
+        def pytest_sessionfinish(session: pytest.Session) -> None:
+            for item in session.items:
+                assert item.stash[outcome_key] == "failed"
+        """
+    )
+    result = testdir.runpytest()
+
+    assert_outcomes(result, passed=1, errors=1)
 
 
 def test_attempts_are_always_available_from_item_stash(testdir):
@@ -311,10 +403,9 @@ def test_attempts_are_always_available_from_item_stash(testdir):
         import pytest
         from pytest_retry import attempts_key
 
-        @pytest.fixture(autouse=True)
-        def report_check(request):
-            yield
-            assert request.node.stash[attempts_key] == 1
+        def pytest_sessionfinish(session: pytest.Session) -> None:
+            for item in session.items:
+                assert item.stash[attempts_key] == 1
         """
     )
     result = testdir.runpytest()
@@ -371,7 +462,7 @@ def test_duration_in_overwrite_timings_mode(testdir):
         from pytest_retry import attempts_key
 
         def pytest_report_teststatus(report: pytest.TestReport):
-            if report.when == "call" and report.outcome != "retried":
+            if report.when == "call" and not hasattr(report, "retried"):
                 assert report.duration < 2
         """
     )
@@ -400,7 +491,7 @@ def test_duration_in_cumulative_timings_mode(testdir):
         from pytest_retry import attempts_key
 
         def pytest_report_teststatus(report: pytest.TestReport):
-            if report.when == "call" and report.outcome != "retried":
+            if report.when == "call" and not hasattr(report, "retried"):
                 assert report.duration > 3
         """
     )

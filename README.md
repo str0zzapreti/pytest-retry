@@ -133,9 +133,9 @@ Tests which have been retried but eventually pass are counted as both retried an
 passed, and tests which have been retried but eventually fail are counted as both
 retried and failed. Skipped, xfailed, and xpassed tests are never retried.
 
-Two pytest stash keys are available to import from the pytest_retry plugin:
-`attempts_key` and `success_key`. These keys are used by the plugin to store the
-number of attempts each item has undergone and whether or not the test passed or
-failed, respectively. (If any stage of setup, call, or teardown fails, a test is
-considered failed overall). These stash keys can be used to retreive these reports
-for use in your own hooks or plugins.
+Three pytest stash keys are available to import from the pytest_retry plugin:
+`attempts_key`, `outcome_key`, and `duration_key`. These keys are used by the plugin
+to store the number of attempts each item has undergone, whether the test passed or
+failed, and the total duration from setup to teardown, respectively. (If any stage of 
+setup, call, or teardown fails, a test is considered failed overall). These stash keys 
+can be used to retrieve these reports for use in your own hooks or plugins.

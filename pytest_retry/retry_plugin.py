@@ -82,8 +82,6 @@ class RetryHandler:
         """
         Return total duration for test summing setup, teardown, and final call
         """
-        if not self.node_stats[item.nodeid]["durations"]["call"]:
-            return 0.0
         return sum(self.node_stats[item.nodeid]["durations"][stage][-1] for stage in stages)
 
     def sum_attempts(self, item: pytest.Item) -> int:
@@ -124,7 +122,7 @@ def should_handle_retry(rep: pytest.TestReport) -> bool:
 def pytest_runtest_protocol(item: pytest.Item) -> Optional[object]:
     retry_manager.node_stats[item.nodeid] = {
         "outcomes": {k: [] for k in stages},
-        "durations": {k: [] for k in stages},
+        "durations": {k: [0.0] for k in stages},
     }
     yield
     item.stash[outcome_key] = retry_manager.simple_outcome(item)
@@ -171,7 +169,7 @@ def pytest_runtest_makereport(
         )
         # If teardown fails, break. Flaky teardowns are not acceptable and should raise immediately
         if t_call.excinfo:
-            item.stash[outcome_key] = 'failed'
+            item.stash[outcome_key] = "failed"
             t_exc_info = (t_call.excinfo.type, t_call.excinfo.value, t_call.excinfo.tb)
             retry_manager.log_test_finalizer_failed(
                 attempt=attempts,
@@ -184,12 +182,10 @@ def pytest_runtest_makereport(
 
         # If teardown passes, send report that the test is being retried
         if attempts == 1:
-            original_report.retried = True  # type: ignore[attr-defined]
+            original_report.outcome = "retried"  # type: ignore
             hook.pytest_runtest_logreport(report=original_report)
-            del original_report.retried
-        retry_manager.log_test_retry(
-            attempt=attempts, test_name=item.name, err=exc_info
-        )
+            original_report.outcome = "failed"
+        retry_manager.log_test_retry(attempt=attempts, test_name=item.name, err=exc_info)
         sleep(delay)
         # Call _initrequest(). Only way to get the setup to run again
         item._initrequest()  # type: ignore[attr-defined]
@@ -229,7 +225,7 @@ def pytest_terminal_summary(terminalreporter: TerminalReporter) -> None:
 def pytest_report_teststatus(
     report: pytest.TestReport,
 ) -> Optional[tuple[str, str, tuple[str, dict]]]:
-    if hasattr(report, "retried"):
+    if report.outcome == "retried":
         return "retried", "R", ("RETRY", {"yellow": True})
     return None
 

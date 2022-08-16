@@ -296,7 +296,7 @@ def test_skipped_outcome_is_available_from_item_stash(testdir):
             for item in session.items:
                 assert item.stash[outcome_key] == "skipped"
                 assert item.stash[attempts_key] == 0
-                assert item.stash[duration_key] == 0.0
+                assert item.stash[duration_key] < 0.1
         """
     )
     result = testdir.runpytest()
@@ -462,7 +462,7 @@ def test_duration_in_overwrite_timings_mode(testdir):
         from pytest_retry import attempts_key
 
         def pytest_report_teststatus(report: pytest.TestReport):
-            if report.when == "call" and not hasattr(report, "retried"):
+            if report.when == "call" and report.outcome != "retried":
                 assert report.duration < 2
         """
     )
@@ -491,7 +491,7 @@ def test_duration_in_cumulative_timings_mode(testdir):
         from pytest_retry import attempts_key
 
         def pytest_report_teststatus(report: pytest.TestReport):
-            if report.when == "call" and not hasattr(report, "retried"):
+            if report.when == "call" and report.outcome != "retried":
                 assert report.duration > 3
         """
     )

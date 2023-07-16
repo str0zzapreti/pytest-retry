@@ -308,24 +308,6 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=False,
         help="if True, retry duration will be included in overall reported test duration",
     )
-    # group.addoption(
-    #     "--only-retry-on",
-    #     action="store",
-    #     dest="filtered_exceptions",
-    #     type=str,
-    #     default="",
-    #     help="specify one or more exceptions separated commas. "
-    #     "Tests will only retry if the exception matches any of the listed exceptions",
-    # )
-    # group.addoption(
-    #     "--retry-unless",
-    #     action="store",
-    #     dest="expected_exceptions",
-    #     type=str,
-    #     default="",
-    #     help="specify one or more exceptions separated commas. "
-    #     "Tests will not be retried if the exception matches any of the listed exceptions",
-    # )
 
 
 def pytest_addhooks(pluginmanager):

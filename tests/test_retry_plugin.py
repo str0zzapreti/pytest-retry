@@ -239,9 +239,7 @@ def test_retry_delay_from_command_line_between_attempts(testdir):
 
 
 def test_passing_outcome_is_available_from_item_stash(testdir):
-    testdir.makepyfile(
-        "def test_success(): assert 1 == 1"
-    )
+    testdir.makepyfile("def test_success(): assert 1 == 1")
     testdir.makeconftest(
         """
         import pytest
@@ -259,9 +257,7 @@ def test_passing_outcome_is_available_from_item_stash(testdir):
 
 
 def test_failed_outcome_is_available_from_item_stash(testdir):
-    testdir.makepyfile(
-        "def test_success(): assert 1 == 2"
-    )
+    testdir.makepyfile("def test_success(): assert 1 == 2")
     testdir.makeconftest(
         """
         import pytest
@@ -305,9 +301,7 @@ def test_skipped_outcome_is_available_from_item_stash(testdir):
 
 
 def test_duration_is_available_from_item_stash(testdir):
-    testdir.makepyfile(
-        """def test_success(): assert 1 == 1"""
-    )
+    testdir.makepyfile("""def test_success(): assert 1 == 1""")
     testdir.makeconftest(
         """
         import pytest
@@ -324,9 +318,7 @@ def test_duration_is_available_from_item_stash(testdir):
 
 
 def test_failed_outcome_after_successful_teardown(testdir):
-    testdir.makepyfile(
-        "def test_success(): assert 1 == 2"
-    )
+    testdir.makepyfile("def test_success(): assert 1 == 2")
     testdir.makeconftest(
         """
         import pytest
@@ -348,9 +340,7 @@ def test_failed_outcome_after_successful_teardown(testdir):
 
 
 def test_failed_outcome_after_unsuccessful_setup(testdir):
-    testdir.makepyfile(
-        "def test_success(): assert 1 == 1"
-    )
+    testdir.makepyfile("def test_success(): assert 1 == 1")
     testdir.makeconftest(
         """
         import pytest
@@ -371,9 +361,7 @@ def test_failed_outcome_after_unsuccessful_setup(testdir):
 
 
 def test_failed_outcome_after_unsuccessful_teardown(testdir):
-    testdir.makepyfile(
-        "def test_success(): assert 1 == 1"
-    )
+    testdir.makepyfile("def test_success(): assert 1 == 1")
     testdir.makeconftest(
         """
         import pytest
@@ -395,9 +383,7 @@ def test_failed_outcome_after_unsuccessful_teardown(testdir):
 
 
 def test_attempts_are_always_available_from_item_stash(testdir):
-    testdir.makepyfile(
-        "def test_success(): assert 1 == 1"
-    )
+    testdir.makepyfile("def test_success(): assert 1 == 1")
     testdir.makeconftest(
         """
         import pytest
@@ -411,6 +397,178 @@ def test_attempts_are_always_available_from_item_stash(testdir):
     result = testdir.runpytest()
 
     assert_outcomes(result, passed=1)
+
+
+def test_global_filtered_exception_is_retried(testdir):
+    testdir.makepyfile(
+        """
+        a = []
+        def test_eventually_passes():
+            a.append(1)
+            if not len(a) > 1:
+                raise AssertionError
+        """
+    )
+    testdir.makeconftest(
+        """
+        import pytest
+
+        def pytest_set_filtered_exceptions():
+            return [AssertionError]
+
+        """
+    )
+    result = testdir.runpytest("--retries", "1")
+
+    assert_outcomes(result, passed=1, retried=1)
+
+
+def test_temporary_filtered_exception_fails_when_attempts_exceeded(testdir):
+    testdir.makepyfile(
+        """
+        a = []
+        def test_eventually_passes():
+            a.append(1)
+            if not len(a) > 4:
+                raise IndexError
+        """
+    )
+    testdir.makeconftest(
+        """
+        import pytest
+
+        def pytest_set_filtered_exceptions():
+            return [IndexError]
+
+        """
+    )
+    result = testdir.runpytest("--retries", "3")
+
+    assert_outcomes(result, passed=0, failed=1, retried=1)
+
+
+def test_temporary_exception_is_not_retried_if_filter_not_matched(testdir):
+    testdir.makepyfile(
+        """
+        a = []
+        def test_eventually_passes():
+            a.append(1)
+            if not len(a) > 1:
+                raise ValueError
+        """
+    )
+    testdir.makeconftest(
+        """
+        import pytest
+
+        def pytest_set_filtered_exceptions():
+            return [IndexError]
+
+        """
+    )
+    result = testdir.runpytest("--retries", "1")
+
+    assert_outcomes(result, passed=0, failed=1, retried=0)
+
+
+def test_temporary_exception_is_retried_if_not_globally_excluded(testdir):
+    testdir.makepyfile(
+        """
+        a = []
+        def test_eventually_passes():
+            a.append(1)
+            if not len(a) > 1:
+                raise ValueError
+        """
+    )
+    testdir.makeconftest(
+        """
+        import pytest
+
+        def pytest_set_excluded_exceptions():
+            return [AssertionError]
+
+        """
+    )
+    result = testdir.runpytest("--retries", "1")
+
+    assert_outcomes(result, passed=1, retried=1)
+
+
+def test_temporary_exception_fails_if_not_excluded_and_attempts_exceeded(testdir):
+    testdir.makepyfile(
+        """
+        a = []
+        def test_eventually_passes():
+            a.append(1)
+            if not len(a) > 4:
+                raise ValueError
+        """
+    )
+    testdir.makeconftest(
+        """
+        import pytest
+
+        def pytest_set_excluded_exceptions():
+            return [AssertionError]
+
+        """
+    )
+    result = testdir.runpytest("--retries", "3")
+
+    assert_outcomes(result, passed=0, failed=1, retried=1)
+
+
+def test_temporary_exception_is_not_retried_if_excluded(testdir):
+    testdir.makepyfile(
+        """
+        a = []
+        def test_eventually_passes():
+            a.append(1)
+            if not len(a) > 1:
+                raise ValueError
+        """
+    )
+    testdir.makeconftest(
+        """
+        import pytest
+
+        def pytest_set_excluded_exceptions():
+            return [ValueError]
+
+        """
+    )
+    result = testdir.runpytest("--retries", "1")
+
+    assert_outcomes(result, passed=1, retried=1)
+
+
+def test_flaky_mark_exception_filter_param_overrides_global_filter(testdir):
+    testdir.makepyfile(
+        """
+        import pytest
+        
+        a = []
+        
+        @pytest.mark.flaky(only_on=[IndexError])
+        def test_eventually_passes():
+            a.append(1)
+            if not len(a) > 1:
+                raise ValueError
+        """
+    )
+    testdir.makeconftest(
+        """
+        import pytest
+
+        def pytest_set_excluded_exceptions():
+            return [ValueError]
+
+        """
+    )
+    result = testdir.runpytest("--retries", "1")
+
+    assert_outcomes(result, passed=0, failed=1, retried=0)
 
 
 def test_attempt_count_is_correct(testdir):

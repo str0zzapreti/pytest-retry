@@ -39,6 +39,35 @@ a few seconds
 $ python -m pytest --retries 2 --retry-delay 5
 ```
 
+#### Advanced Options:
+There are two custom hooks provided for the purpose of setting global exception
+filters for your entire Pytest suite. `pytest_set_filtered_exceptions`
+and `pytest_set_excluded_exceptions`. You can define either of them in your 
+conftest.py file and return a list of exception types. Note: these hooks are 
+mutually exclusive and cannot both be defined at the same time.
+
+Example:
+```
+def pytest_set_excluded_exceptions():
+    """
+    All tests will be retried unless they fail due to an AssertionError or CustomError
+    """
+    return [AssertionError, CustomError]
+```
+
+There is a command line option to specify the test timing method, which can either
+be `overwrite` (default) or `cumulative`. With cumulative timing, the duration of 
+each test attempt is summed for the reported overall test duration. The default
+behavior simply reports the timing of the final attempt.
+
+```
+$ python -m pytest --retries 2 --cumulative-timing 1
+```
+
+If you're not sure which to use, stick with the default `overwrite` method. This
+generally plays nicer with time-based test splitting algorithms and will result in
+more even splits. 
+
 ### 2. Pytest flaky mark
 
 Mark individual tests as 'flaky' to retry them when they fail. If no command line
@@ -57,14 +86,35 @@ specified as well
 ```
 @pytest.mark.flaky(retries=3, delay=1)
 def test_unreliable_service():
+    # This test will be retried up to 3 times (4 attempts total) with a
+    # one second delay between each attempt
     ...
 ```
 
-Finally, there is both a command line option and flaky mark argument for the test
-timing method, which can either be `overwrite` (default) or `cumulative`. With 
-cumulative timing, the duration of each test attempt is summed for the overall test
-duration reported at the end. The default behavior simply uses the timing for
-the final attempt. 
+If you want to control filtered or excluded exceptions per-test, the flaky mark
+provides the `only_on` and `exclude` arguments which both take a list of exception
+types, including any custom types you may have defined for your project. Note that 
+only one of these arguments may be used at a time.
+
+A test with a list of `only_on` exceptions will only be retried if it fails with
+one of the listed exceptions. A test with a list of `exclude` exceptions will
+only be retried if it fails with an exception which does not match any of the
+listed exceptions.
+
+If the exception for a subsequent attempt changes and no longer matches the filter,
+no further attempts will be made and the test will immediately fail.
+
+```
+@pytest.mark.flaky(retries=2, only_on=[ValueError, IndexError])
+def test_unreliable_service():
+    # This test will only be retried if it fails due to raising a ValueError
+    # or an IndexError. e.g., an AssertionError will fail without retrying
+    ...
+```
+
+Finally, there is a flaky mark argument for the test timing method, which can either
+be `overwrite` (default) or `cumulative`. See **Command Line** > **Advanced Options** 
+for more information
 
 ```
 @pytest.mark.flaky(timing='overwrite')
@@ -72,11 +122,8 @@ def test_unreliable_service():
     ...
 ```
 
-If you're not sure which to use, stick with the default `overwrite` method. This
-generally plays nicer with time-based test splitting algorithms and will result in
-more even splits. 
-
-The flaky mark will override any command line options if passed when running Pytest.
+A flaky mark will override any command line options and exception filter hooks
+specified when running Pytest.
 
 ### Things to consider
 

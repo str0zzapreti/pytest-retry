@@ -4,6 +4,7 @@ from time import sleep
 from io import StringIO
 from traceback import format_exception
 from typing import Generator, Optional
+from collections.abc import Iterable
 from _pytest.terminal import TerminalReporter
 from _pytest.logging import caplog_records_key
 
@@ -12,6 +13,35 @@ outcome_key = pytest.StashKey[str]()
 attempts_key = pytest.StashKey[int]()
 duration_key = pytest.StashKey[float]()
 stages = ("setup", "call", "teardown")
+
+
+class ConfigurationError(Exception):
+    pass
+
+
+class ExceptionFilter:
+    """
+    Helper class which returns a bool when called based on the filter type (expected or excluded)
+    and whether the exception exists within the list
+    """
+
+    def __init__(self, expected_exceptions: Iterable, excluded_exceptions: Iterable):
+        if expected_exceptions and excluded_exceptions:
+            raise ConfigurationError(
+                "filtered_exceptions and excluded_exceptions are exclusive and cannot "
+                "be defined simultaneously."
+            )
+        self.list_type = bool(expected_exceptions)
+        self.filter = expected_exceptions or excluded_exceptions or []
+
+    def __call__(self, exception_type: Optional[type[BaseException]]) -> bool:
+        try:
+            return not self.filter or bool(self.list_type == bool(exception_type in self.filter))
+        except TypeError:
+            raise ConfigurationError(
+                "Filtered or excluded exceptions must be passed as a collection. If using the "
+                "flaky mark, this means `only_on` or `exclude` args must be a collection too."
+            )
 
 
 class RetryHandler:
@@ -144,6 +174,11 @@ def pytest_runtest_makereport(
     flake_mark = item.get_closest_marker("flaky")
     if flake_mark is None:
         return
+    exception_filter = ExceptionFilter(
+        flake_mark.kwargs.get("only_on", []), flake_mark.kwargs.get("excluded", [])
+    )
+    if not exception_filter(call.excinfo.type):  # type: ignore
+        return
     delay = flake_mark.kwargs.get("delay", 0)
     retries = flake_mark.kwargs.get("retries", 1)
     timing = flake_mark.kwargs.get("timing", "overwrite")
@@ -200,7 +235,11 @@ def pytest_runtest_makereport(
             hook.pytest_exception_interact(node=item, call=call, report=retry_report)
 
         attempts += 1
-        should_keep_retrying = not retry_report.passed and attempts <= retries
+        should_keep_retrying = (
+            not retry_report.passed
+            and attempts <= retries
+            and exception_filter(call.excinfo.type)  # type: ignore
+        )
 
         if not should_keep_retrying:
             original_report.outcome = retry_report.outcome
@@ -233,9 +272,10 @@ def pytest_report_teststatus(
 def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers",
-        "flaky(retries=1, delay=0): indicate a flaky test which"
-        "will be retried the number of times specified with an"
-        "(optional) specified delay between each attempt",
+        "flaky(retries=1, delay=0, only_on=..., exclude=...): indicate a flaky test which "
+        "will be retried the number of times specified with an (optional) specified "
+        "delay between each attempt. Collections of one or more exceptions can be passed so "
+        "that the test is retried only on those exceptions, or excluding those exceptions.",
     )
     if config.getoption("verbose"):
         # if pytest config has -v enabled, then don't limit traceback length
@@ -272,12 +312,32 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 
+def pytest_addhooks(pluginmanager: pytest.PytestPluginManager) -> None:
+    """This example assumes the hooks are grouped in the 'sample_hook' module."""
+    from pytest_retry import hooks
+
+    pluginmanager.add_hookspecs(hooks)
+
+
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     if not config.getoption("--retries"):
         return
     retry_delay = config.getoption("--retry-delay") or 0
     timing = "cumulative" if config.getoption("--cumulative-timing") else "overwrite"
-    flaky = pytest.mark.flaky(retries=config.option.retries, delay=retry_delay, timing=timing)
+    filtered_exceptions: Iterable = config.hook.pytest_set_filtered_exceptions() or []
+    excluded_exceptions: Iterable = config.hook.pytest_set_excluded_exceptions() or []
+    if filtered_exceptions and excluded_exceptions:
+        raise ConfigurationError(
+            "filtered_exceptions and excluded_exceptions should not be defined"
+            "simultaneously. Use flaky marks to override the global config"
+        )
+    flaky = pytest.mark.flaky(
+        retries=config.option.retries,
+        delay=retry_delay,
+        timing=timing,
+        only_on=filtered_exceptions,
+        exclude=excluded_exceptions,
+    )
     for item in items:
         if "flaky" not in item.keywords:
             item.add_marker(flaky)

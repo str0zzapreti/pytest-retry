@@ -34,7 +34,7 @@ class ExceptionFilter:
         self.list_type = bool(expected_exceptions)
         self.filter = expected_exceptions or excluded_exceptions or []
 
-    def __call__(self, exception_type: type[BaseException] | None) -> bool:
+    def __call__(self, exception_type: Optional[type[BaseException]]) -> bool:
         try:
             return not self.filter or bool(self.list_type == bool(exception_type in self.filter))
         except TypeError:

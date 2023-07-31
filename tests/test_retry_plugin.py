@@ -562,7 +562,7 @@ def test_flaky_mark_exception_filter_param_overrides_global_filter(testdir):
         import pytest
 
         def pytest_set_excluded_exceptions():
-            return [ValueError]
+            return [IndexError]
 
         """
     )

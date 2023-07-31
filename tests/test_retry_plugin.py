@@ -547,9 +547,9 @@ def test_flaky_mark_exception_filter_param_overrides_global_filter(testdir):
     testdir.makepyfile(
         """
         import pytest
-        
+
         a = []
-        
+
         @pytest.mark.flaky(only_on=[IndexError])
         def test_eventually_passes():
             a.append(1)

@@ -34,7 +34,7 @@ class ExceptionFilter:
         self.list_type = bool(expected_exceptions)
         self.filter = expected_exceptions or excluded_exceptions or []
 
-    def __call__(self, exception_type: type[BaseException]) -> bool:
+    def __call__(self, exception_type: type[BaseException] | None) -> bool:
         try:
             return not self.filter or bool(self.list_type == bool(exception_type in self.filter))
         except TypeError:
@@ -177,7 +177,7 @@ def pytest_runtest_makereport(
     exception_filter = ExceptionFilter(
         flake_mark.kwargs.get("only_on", []), flake_mark.kwargs.get("excluded", [])
     )
-    if not exception_filter(call.excinfo.type):
+    if not exception_filter(call.excinfo.type):  # type: ignore
         return
     delay = flake_mark.kwargs.get("delay", 0)
     retries = flake_mark.kwargs.get("retries", 1)
@@ -236,7 +236,9 @@ def pytest_runtest_makereport(
 
         attempts += 1
         should_keep_retrying = (
-            not retry_report.passed and attempts <= retries and exception_filter(call.excinfo.type)
+            not retry_report.passed
+            and attempts <= retries
+            and exception_filter(call.excinfo.type)  # type: ignore
         )
 
         if not should_keep_retrying:
@@ -310,7 +312,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 
-def pytest_addhooks(pluginmanager):
+def pytest_addhooks(pluginmanager: pytest.PytestPluginManager) -> None:
     """This example assumes the hooks are grouped in the 'sample_hook' module."""
     from pytest_retry import hooks
 

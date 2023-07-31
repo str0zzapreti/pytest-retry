@@ -2,7 +2,7 @@ import pytest
 
 
 @pytest.hookspec(firstresult=True)
-def pytest_set_filtered_exceptions():
+def pytest_set_filtered_exceptions() -> None:
     """
     Return a collection of exception classes to be used as a filter when retrying tests.
 
@@ -15,10 +15,11 @@ def pytest_set_filtered_exceptions():
         def pytest_set_filtered_exceptions():
             return (CustomError, ValueError)
     """
+    ...
 
 
 @pytest.hookspec(firstresult=True)
-def pytest_set_excluded_exceptions():
+def pytest_set_excluded_exceptions() -> None:
     """
     Return a collection of exception classes to be excluded when retrying tests.
 
@@ -31,3 +32,4 @@ def pytest_set_excluded_exceptions():
         def pytest_set_filtered_exceptions():
             return (CustomError, ValueError)
     """
+    ...

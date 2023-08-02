@@ -130,6 +130,27 @@ def test_retry_passes_after_temporary_setup_failure(testdir):
     assert_outcomes(result, passed=1, retried=1)
 
 
+def test_retry_exits_immediately_on_teardown_failure(testdir):
+    testdir.makepyfile(
+        """
+        import pytest
+
+        @pytest.fixture()
+        def bad_teardown():
+            yield
+            raise ValueError
+
+        a = []
+        def test_eventually_passes(bad_teardown):
+            a.append(1)
+            assert len(a) > 1
+        """
+    )
+    result = testdir.runpytest("--retries", "1")
+
+    assert_outcomes(result, passed=0, failed=1, retried=0)
+
+
 def test_retry_fails_after_consistent_test_failure(testdir):
     testdir.makepyfile("def test_fail(): assert False")
     result = testdir.runpytest("--retries", "1")
@@ -149,27 +170,6 @@ def test_retry_passes_after_temporary_test_failure(testdir):
     result = testdir.runpytest("--retries", "1")
 
     assert_outcomes(result, passed=1, retried=1)
-
-
-def test_exit_immediately_on_teardown_failure(testdir):
-    testdir.makepyfile(
-        """
-        import pytest
-        
-        @pytest.fixture()
-        def bad_teardown():
-            yield
-            raise ValueError
-        
-        a = []
-        def test_eventually_passes(bad_teardown):
-            a.append(1)
-            assert len(a) > 1
-        """
-    )
-    result = testdir.runpytest("--retries", "1")
-
-    assert_outcomes(result, passed=0, failed=1, retried=0)
 
 
 def test_retry_passes_after_temporary_test_failure_with_flaky_mark(testdir):

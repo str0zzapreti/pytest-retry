@@ -54,27 +54,21 @@ class RetryHandler:
         self.stream = StringIO()
         self.trace_limit: Optional[int] = -1
         self.node_stats: dict[str, dict] = {}
+        self.messages = (
+            " failed on attempt {attempt}! Retrying!\n\t",
+            " failed after {attempt} attempts!\n\t",
+            " teardown failed on attempt {attempt}! Exiting immediately!\n\t",
+        )
 
-    def log_test_retry(self, attempt: int, test_name: str, err: tuple) -> None:
+    def log_attempt(
+        self, attempt: int, name: str, exc: pytest.ExceptionInfo, outcome: int
+    ) -> None:
+        message = self.messages[outcome].format(attempt=attempt)
+        err = (exc.type, exc.value, exc.tb)  # type: ignore
         formatted_trace = (
             "".join(format_exception(*err, limit=self.trace_limit)).replace("\n", "\n\t").rstrip()
         )
-        message = f" failed on attempt {attempt}! Retrying!\n\t"
-        self.stream.writelines([f"\t{test_name}", message, formatted_trace, "\n\n"])
-
-    def log_test_totally_failed(self, attempt: int, test_name: str, err: tuple) -> None:
-        formatted_trace = (
-            "".join(format_exception(*err, limit=self.trace_limit)).replace("\n", "\n\t").rstrip()
-        )
-        message = f" failed after {attempt} attempts!\n\t"
-        self.stream.writelines([f"\t{test_name}", message, formatted_trace, "\n\n"])
-
-    def log_test_finalizer_failed(self, attempt: int, test_name: str, err: tuple) -> None:
-        formatted_trace = (
-            "".join(format_exception(*err, limit=self.trace_limit)).replace("\n", "\n\t").rstrip()
-        )
-        message = f" finalizer failed on attempt {attempt}! Exiting immediately!\n\t"
-        self.stream.writelines([f"\t{test_name}", message, formatted_trace, "\n\n"])
+        self.stream.writelines([f"\t{name}", message, formatted_trace, "\n\n"])
 
     def add_retry_report(self, terminalreporter: TerminalReporter) -> None:
         contents = self.stream.getvalue()
@@ -188,8 +182,6 @@ def pytest_runtest_makereport(
     hook = item.ihook
 
     while True:
-        # Parse error info from original run
-        exc_info = (call.excinfo.type, call.excinfo.value, call.excinfo.tb)  # type: ignore
         if call.when == "setup":
             break  # will handle fixture setup retries in v2, if necessary. For now, this is fine.
         # Default teardowns are already excluded, so this must be the `call` stage
@@ -205,11 +197,11 @@ def pytest_runtest_makereport(
         # If teardown fails, break. Flaky teardowns are not acceptable and should raise immediately
         if t_call.excinfo:
             item.stash[outcome_key] = "failed"
-            t_exc_info = (t_call.excinfo.type, t_call.excinfo.value, t_call.excinfo.tb)
-            retry_manager.log_test_finalizer_failed(
+            retry_manager.log_attempt(
                 attempt=attempts,
-                test_name=item.name,
-                err=t_exc_info,
+                name=item.name,
+                exc=t_call.excinfo,
+                outcome=2
             )
             # Prevents a KeyError when an error during retry teardown causes a redundant teardown
             item.stash[caplog_records_key] = {}  # type: ignore
@@ -220,7 +212,7 @@ def pytest_runtest_makereport(
             original_report.outcome = "retried"  # type: ignore
             hook.pytest_runtest_logreport(report=original_report)
             original_report.outcome = "failed"
-        retry_manager.log_test_retry(attempt=attempts, test_name=item.name, err=exc_info)
+        retry_manager.log_attempt(attempt=attempts, name=item.name, exc=call.excinfo, outcome=0)
         sleep(delay)
         # Call _initrequest(). Only way to get the setup to run again
         item._initrequest()  # type: ignore[attr-defined]
@@ -250,9 +242,8 @@ def pytest_runtest_makereport(
                 original_report.duration += retry_report.duration
 
             if retry_report.failed:
-                exc_info = (call.excinfo.type, call.excinfo.value, call.excinfo.tb)  # type: ignore
-                retry_manager.log_test_totally_failed(
-                    attempt=attempts, test_name=item.name, err=exc_info
+                retry_manager.log_attempt(
+                    attempt=attempts, name=item.name, exc=call.excinfo, outcome=1
                 )
             break
 

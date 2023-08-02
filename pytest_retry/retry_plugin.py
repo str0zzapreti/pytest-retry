@@ -61,7 +61,7 @@ class RetryHandler:
         )
 
     def log_attempt(
-        self, attempt: int, name: str, exc: pytest.ExceptionInfo, outcome: int
+        self, attempt: int, name: str, exc: Optional[pytest.ExceptionInfo], outcome: int
     ) -> None:
         message = self.messages[outcome].format(attempt=attempt)
         err = (exc.type, exc.value, exc.tb)  # type: ignore
@@ -198,10 +198,7 @@ def pytest_runtest_makereport(
         if t_call.excinfo:
             item.stash[outcome_key] = "failed"
             retry_manager.log_attempt(
-                attempt=attempts,
-                name=item.name,
-                exc=t_call.excinfo,
-                outcome=2
+                attempt=attempts, name=item.name, exc=t_call.excinfo, outcome=2
             )
             # Prevents a KeyError when an error during retry teardown causes a redundant teardown
             item.stash[caplog_records_key] = {}  # type: ignore

@@ -167,18 +167,21 @@ def pytest_runtest_makereport(
     retry_manager.record_node_stats(original_report)
     # Set dynamic outcome for each stage until runtest protocol has completed.
     item.stash[outcome_key] = original_report.outcome
-
     if not should_handle_retry(original_report):
         return
-    flake_mark = item.get_closest_marker("flaky")
 
+    flake_mark = item.get_closest_marker("flaky")
     if flake_mark is None:
         return
+
+    condition = flake_mark.kwargs.get("condition")
+    if condition is False:
+        return
+
     exception_filter = ExceptionFilter(
         flake_mark.kwargs.get("only_on", []),
         flake_mark.kwargs.get("exclude", []),
     ) or ExceptionFilter(Defaults.FILTERED_EXCEPTIONS, Defaults.EXCLUDED_EXCEPTIONS)
-
     if not exception_filter(call.excinfo.type):  # type: ignore
         return
 
@@ -268,10 +271,11 @@ def pytest_report_teststatus(
 def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers",
-        "flaky(retries=1, delay=0, only_on=..., exclude=...): indicate a flaky test which "
-        "will be retried the number of times specified with an (optional) specified "
+        "flaky(retries=1, delay=0, only_on=..., exclude=..., condition=...): indicate a flaky "
+        "test which will be retried the number of times specified with an (optional) specified "
         "delay between each attempt. Collections of one or more exceptions can be passed so "
-        "that the test is retried only on those exceptions, or excluding those exceptions.",
+        "that the test is retried only on those exceptions, or excluding those exceptions. "
+        "Any statement which returns a bool can be used as a condition",
     )
     if config.getoption("verbose"):
         # if pytest config has -v enabled, then don't limit traceback length

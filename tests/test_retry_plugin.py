@@ -561,7 +561,7 @@ def test_temporary_exception_is_not_retried_if_excluded(testdir):
     )
     result = testdir.runpytest("--retries", "1")
 
-    assert_outcomes(result, passed=1, retried=1)
+    assert_outcomes(result, passed=0, failed=1, retried=0)
 
 
 def test_flaky_mark_exception_filter_param_overrides_global_filter(testdir):

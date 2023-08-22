@@ -677,3 +677,33 @@ def test_duration_in_cumulative_timings_mode(testdir):
     result = testdir.runpytest("--retries", "2", "--cumulative-timing", "1")
 
     assert_outcomes(result, passed=1, retried=1)
+
+
+def test_conditional_flaky_marks_evaluate_correctly(testdir):
+    testdir.makepyfile(
+        """
+        import pytest
+
+        a = []
+        b = []
+        c = []
+
+        @pytest.mark.flaky(retries=2, condition=True)
+        def test_eventually_passes():
+            a.append(1)
+            assert len(a) > 2
+
+        @pytest.mark.flaky(retries=2, condition=True)
+        def test_eventually_passes_again():
+            b.append(1)
+            assert len(b) > 2
+
+        @pytest.mark.flaky(retries=2, condition=False)
+        def test_eventually_passes_once_more():
+            c.append(1)
+            assert len(c) > 2
+        """
+    )
+    result = testdir.runpytest()
+
+    assert_outcomes(result, passed=2, failed=1, retried=2)

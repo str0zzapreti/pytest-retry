@@ -112,6 +112,18 @@ def test_unreliable_service():
     ...
 ```
 
+If you want some other generalized condition to control whether a test is retried, use the
+`condition` argument. Any statement which results in a bool can be used here to add granularity
+to your retries. The test will only be retried if `condition` is `True`. Note, there is no
+matching command line option for `condition`, but if you need to globally apply this type of logic
+to all of your tests, consider invoking the `pytest_collection_modifyitems` hook.
+
+```
+@pytest.mark.flaky(retries=2, condition=sys.platform.startswith('win32'))
+def test_only_flaky_on_some_systems():
+    # This test will only be retried if sys.platform.startswith('win32') evaluates to `True`
+```
+
 Finally, there is a flaky mark argument for the test timing method, which can either
 be `overwrite` (default) or `cumulative`. See **Command Line** > **Advanced Options** 
 for more information

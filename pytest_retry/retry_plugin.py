@@ -5,7 +5,7 @@ from io import StringIO
 from traceback import format_exception
 from typing import Generator, Optional
 from collections.abc import Iterable
-from configs import Defaults
+from pytest_retry.configs import Defaults
 from _pytest.terminal import TerminalReporter
 from _pytest.logging import caplog_records_key
 

@@ -130,18 +130,15 @@ def has_interactive_exception(call: pytest.CallInfo) -> bool:
     return True
 
 
-def should_handle_retry(rep: pytest.TestReport) -> bool:
-    # if test passed, don't retry
-    if rep.passed:
+def should_handle_retry(call: pytest.CallInfo) -> bool:
+    if call.excinfo is None:
         return False
     # if teardown stage, don't retry
-    if rep.when == "teardown":
+    # may handle fixture setup retries in v2 if requested. For now, this is fine.
+    if call.when in {"setup", "teardown"}:
         return False
     # if test was skipped, don't retry
-    if rep.skipped:
-        return False
-    # if test is xfail, don't retry
-    if hasattr(rep, "wasxfail"):
+    if call.excinfo.typename == "Skipped":
         return False
     return True
 
@@ -167,7 +164,11 @@ def pytest_runtest_makereport(
     retry_manager.record_node_stats(original_report)
     # Set dynamic outcome for each stage until runtest protocol has completed.
     item.stash[outcome_key] = original_report.outcome
-    if not should_handle_retry(original_report):
+
+    if not should_handle_retry(call):
+        return
+    # xfail tests don't raise a Skipped exception if they fail, but are still marked as skipped
+    if original_report.skipped is True:
         return
 
     flake_mark = item.get_closest_marker("flaky")
@@ -192,8 +193,6 @@ def pytest_runtest_makereport(
     hook = item.ihook
 
     while True:
-        if call.when == "setup":
-            break  # will handle fixture setup retries in v2, if necessary. For now, this is fine.
         # Default teardowns are already excluded, so this must be the `call` stage
         # Try preliminary teardown using a fake item to ensure every local fixture (i.e.
         # excluding session) is torn down. Yes, including module and class fixtures

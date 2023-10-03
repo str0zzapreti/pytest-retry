@@ -39,7 +39,7 @@ def test_no_retry_on_pass(testdir):
 
 
 def test_no_retry_on_fail_without_plugin(testdir):
-    testdir.makepyfile("def test_success(): assert False")
+    testdir.makepyfile("def test_failure(): assert False")
     result = testdir.runpytest()
 
     assert_outcomes(result, passed=0, failed=1, retried=0)
@@ -83,7 +83,7 @@ def test_no_retry_on_xfail_mark(testdir):
     )
     result = testdir.runpytest("--retries", "1")
 
-    assert_outcomes(result, passed=0, xfailed=1)
+    assert_outcomes(result, passed=0, xfailed=1, failed=0)
 
 
 def test_no_retry_on_xpass(testdir):
@@ -97,7 +97,21 @@ def test_no_retry_on_xpass(testdir):
     )
     result = testdir.runpytest("--retries", "1")
 
-    assert_outcomes(result, passed=0, xpassed=1)
+    assert_outcomes(result, passed=0, xpassed=1, failed=0)
+
+
+def test_no_retry_on_strict_xpass(testdir):
+    testdir.makepyfile(
+        """
+        import pytest
+        @pytest.mark.xfail(strict=True)
+        def test_xpass():
+            assert 1 == 1
+        """
+    )
+    result = testdir.runpytest("--retries", "1")
+
+    assert_outcomes(result, passed=0, xpassed=0, failed=1)
 
 
 def test_retry_fails_after_consistent_setup_failure(testdir):

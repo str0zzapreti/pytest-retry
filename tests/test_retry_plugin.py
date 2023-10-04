@@ -267,10 +267,11 @@ def test_retry_delay_from_command_line_between_attempts(testdir):
             assert len(a) > 2
         """
     )
-    result = testdir.runpytest("--retries", "2", "--retry-delay", "2")
+    result = testdir.runpytest("--retries", "2", "--retry-delay", "0.2")
 
     assert_outcomes(result, passed=1, retried=1)
-    assert result.duration > 4
+    assert result.duration > 0.4
+    assert result.duration < 0.7
 
 
 def test_passing_outcome_is_available_from_item_stash(testdir):
@@ -634,6 +635,105 @@ def test_attempt_count_is_correct(testdir):
     assert_outcomes(result, passed=1, retried=1)
 
 
+def test_flaky_mark_overrides_command_line_options(testdir):
+    testdir.makepyfile(
+        """
+        import pytest
+
+        a = []
+        b = []
+
+        @pytest.mark.flaky(retries=3, delay=0)
+        def test_flaky_mark_options():
+            a.append(1)
+            assert len(a) > 3
+
+        def test_default_commandline_options():
+            b.append(1)
+            assert len(b) > 3
+        """
+    )
+    testdir.makeconftest(
+        """
+        import pytest
+        from pytest_retry import attempts_key
+
+        def pytest_sessionfinish(session: pytest.Session) -> None:
+            for item in session.items:
+                if item.name == "test_flaky_mark_options":
+                    assert item.stash[attempts_key] == 4
+                if item.name == "test_default_commandline_options":
+                    assert item.stash[attempts_key] == 3
+        """
+    )
+    result = testdir.runpytest("--retries", "2", "--retry-delay", "1")
+
+    assert_outcomes(result, passed=1, failed=1, retried=2)
+    assert result.duration > 2
+    assert result.duration < 3
+
+
+def test_configuration_by_ini_file(testdir):
+    testdir.makeini(
+        """
+        [pytest]
+        retries = 2
+        retry_delay = 0.5
+        cumulative_timing = true
+        """
+    )
+    testdir.makepyfile(
+        """
+        from time import sleep
+        a = []
+
+        def test_ini_settings():
+            sleep(2 - len(a))
+            a.append(1)
+            assert len(a) > 2
+        """
+    )
+    testdir.makeconftest(
+        """
+        import pytest
+        from pytest_retry import attempts_key
+
+        def pytest_sessionfinish(session: pytest.Session) -> None:
+            for item in session.items:
+                assert item.stash[attempts_key] == 3
+
+        def pytest_report_teststatus(report: pytest.TestReport):
+            if report.when == "call" and report.outcome != "retried":
+                assert report.duration > 3
+                assert report.duration < 4
+        """
+    )
+    result = testdir.runpytest()
+
+    assert_outcomes(result, passed=1, retried=1)
+
+
+def test_configuration_by_pyproject_toml_file(testdir):
+    testdir.makepyprojecttoml(
+        """
+        [tool.pytest.ini_options]
+        retries = 1
+        retry_delay = 0.3
+        """
+    )
+    testdir.makepyfile(
+        """
+        def test_toml_settings():
+            assert False
+        """
+    )
+    result = testdir.runpytest()
+
+    assert_outcomes(result, passed=0, failed=1, retried=1)
+    assert result.duration > 0.3
+    assert result.duration < 0.6
+
+
 def test_duration_in_overwrite_timings_mode(testdir):
     testdir.makepyfile(
         """
@@ -644,7 +744,7 @@ def test_duration_in_overwrite_timings_mode(testdir):
 
         @pytest.mark.flaky(retries=2)
         def test_eventually_passes():
-            sleep(2 - len(a))
+            sleep(1.5 - len(a))
             a.append(1)
             assert len(a) > 1
         """
@@ -656,7 +756,7 @@ def test_duration_in_overwrite_timings_mode(testdir):
 
         def pytest_report_teststatus(report: pytest.TestReport):
             if report.when == "call" and report.outcome != "retried":
-                assert report.duration < 2
+                assert report.duration < 0.6
         """
     )
     result = testdir.runpytest()
@@ -681,7 +781,6 @@ def test_duration_in_cumulative_timings_mode(testdir):
     testdir.makeconftest(
         """
         import pytest
-        from pytest_retry import attempts_key
 
         def pytest_report_teststatus(report: pytest.TestReport):
             if report.when == "call" and report.outcome != "retried":

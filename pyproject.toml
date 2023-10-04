@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pytest-retry"
-version = "1.4.2"
+version = "1.5.0"
 description = "Adds the ability to retry flaky tests in CI environments"
 readme = "README.md"
 authors = [{ name = "str0zzapreti" }]
@@ -33,6 +33,9 @@ Homepage = "https://github.com/str0zzapreti/pytest-retry"
 
 [project.entry-points.pytest11]
 pytest-retry = "pytest_retry.retry_plugin"
+
+[tool.pytest.ini_options]
+addopts = "-p no:pytest-retry"
 
 [tool.mypy]
 python_version = "3.10"

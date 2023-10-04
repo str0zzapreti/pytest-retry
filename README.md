@@ -20,8 +20,9 @@ $ pip install pytest-retry
 
 There are two main ways to use pytest-retry:
 
-### 1. Command line
+### 1. Global settings
 
+Once installed, pytest-retry adds new command line and ini config options for pytest.
 Run Pytest with the command line argument --retries in order to retry every test in 
 the event of a failure. The following example will retry each failed up to two times
 before proceeding to the next test:
@@ -66,7 +67,28 @@ $ python -m pytest --retries 2 --cumulative-timing 1
 
 If you're not sure which to use, stick with the default `overwrite` method. This
 generally plays nicer with time-based test splitting algorithms and will result in
-more even splits. 
+more even splits.
+
+Instead of command line arguments, you can set any of these config options in your
+pytest.ini, tox.ini, or pyproject.toml file. Any command line arguments will take
+precedence over options specified in one of these config files. Here are some
+sample configs that you can copy into your project to get started:
+
+_pyproject.toml_
+```
+[tool.pytest.ini_options]
+retries = 2
+retry_delay = 0.5
+cumulative_timing = false
+```
+
+_config.ini/tox.ini_
+```
+[pytest]
+retries = 2
+retry_delay = 0.5
+cumulative_timing = false
+```
 
 ### 2. Pytest flaky mark
 

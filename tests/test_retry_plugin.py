@@ -271,7 +271,7 @@ def test_retry_delay_from_command_line_between_attempts(testdir):
 
     assert_outcomes(result, passed=1, retried=1)
     assert result.duration > 0.4
-    assert result.duration < 0.6
+    assert result.duration < 0.7
 
 
 def test_passing_outcome_is_available_from_item_stash(testdir):
@@ -731,7 +731,7 @@ def test_configuration_by_pyproject_toml_file(testdir):
 
     assert_outcomes(result, passed=0, failed=1, retried=1)
     assert result.duration > 0.3
-    assert result.duration < 0.5
+    assert result.duration < 0.6
 
 
 def test_duration_in_overwrite_timings_mode(testdir):

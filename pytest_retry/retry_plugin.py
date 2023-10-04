@@ -187,7 +187,7 @@ def pytest_runtest_makereport(
         return
 
     retries = flake_mark.kwargs.get("retries", Defaults.RETRIES)
-    delay = flake_mark.kwargs.get("delay", Defaults.DELAY)
+    delay = flake_mark.kwargs.get("delay", Defaults.RETRY_DELAY)
     cumulative_timing = flake_mark.kwargs.get("cumulative_timing", Defaults.CUMULATIVE_TIMING)
     attempts = 1
     hook = item.ihook
@@ -246,7 +246,9 @@ def pytest_runtest_makereport(
             if cumulative_timing is False:
                 original_report.duration = retry_report.duration
             else:
-                original_report.duration += retry_report.duration
+                original_report.duration = sum(
+                    retry_manager.node_stats[original_report.nodeid]["durations"]["call"]
+                )
 
             if retry_report.failed:
                 retry_manager.log_attempt(
@@ -280,8 +282,13 @@ def pytest_configure(config: pytest.Config) -> None:
         # if pytest config has -v enabled, then don't limit traceback length
         retry_manager.trace_limit = None
     Defaults.configure(config)
-    Defaults.FILTERED_EXCEPTIONS = config.hook.pytest_set_filtered_exceptions() or []
-    Defaults.EXCLUDED_EXCEPTIONS = config.hook.pytest_set_excluded_exceptions() or []
+    Defaults.add("FILTERED_EXCEPTIONS", config.hook.pytest_set_filtered_exceptions() or [])
+    Defaults.add("EXCLUDED_EXCEPTIONS", config.hook.pytest_set_excluded_exceptions() or [])
+
+
+RETRIES_HELP_TEXT = "number of times to retry failed tests. Defaults to 0."
+DELAY_HELP_TEXT = "configure a delay (in seconds) between retries."
+TIMING_HELP_TEXT = "if True, retry duration will be included in overall reported test duration"
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -293,25 +300,25 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         action="store",
         dest="retries",
         type=int,
-        default=0,
-        help="number of times to retry failed tests. Defaults to 0.",
+        help=RETRIES_HELP_TEXT,
     )
     group.addoption(
         "--retry-delay",
         action="store",
-        dest="delay",
+        dest="retry_delay",
         type=float,
-        default=0,
-        help="add a delay (in seconds) between retries.",
+        help=DELAY_HELP_TEXT,
     )
     group.addoption(
         "--cumulative-timing",
         action="store",
         dest="cumulative_timing",
         type=bool,
-        default=False,
-        help="if True, retry duration will be included in overall reported test duration",
+        help=TIMING_HELP_TEXT,
     )
+    parser.addini("retries", RETRIES_HELP_TEXT, default=0, type="string")
+    parser.addini("retry_delay", DELAY_HELP_TEXT, default=0, type="string")
+    parser.addini("cumulative_timing", TIMING_HELP_TEXT, default=False, type="string")
 
 
 def pytest_addhooks(pluginmanager: pytest.PytestPluginManager) -> None:
@@ -322,9 +329,9 @@ def pytest_addhooks(pluginmanager: pytest.PytestPluginManager) -> None:
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    if not config.getoption("--retries"):
+    if not (config.getoption("--retries") or config.getini("retries")):
         return
-    flaky = pytest.mark.flaky(retries=config.option.retries)
+    flaky = pytest.mark.flaky(retries=Defaults.RETRIES)
     for item in items:
         if "flaky" not in item.keywords:
             item.add_marker(flaky)

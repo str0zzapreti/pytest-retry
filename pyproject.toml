@@ -34,6 +34,9 @@ Homepage = "https://github.com/str0zzapreti/pytest-retry"
 [project.entry-points.pytest11]
 pytest-retry = "pytest_retry.retry_plugin"
 
+[tool.pytest.ini_options]
+addopts = "-p no:pytest-retry"
+
 [tool.mypy]
 python_version = "3.10"
 cache_dir = "/dev/null"

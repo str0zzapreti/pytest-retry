@@ -638,15 +638,15 @@ def test_flaky_mark_overrides_command_line_options(testdir):
     testdir.makepyfile(
         """
         import pytest
-        
+
         a = []
         b = []
-        
+
         @pytest.mark.flaky(retries=3, delay=0)
         def test_flaky_mark_options():
             a.append(1)
             assert len(a) > 3
-        
+
         def test_default_commandline_options():
             b.append(1)
             assert len(b) > 3
@@ -685,7 +685,7 @@ def test_configuration_by_ini_file(testdir):
         """
         from time import sleep
         a = []
-        
+
         def test_ini_settings():
             sleep(2 - len(a))
             a.append(1)

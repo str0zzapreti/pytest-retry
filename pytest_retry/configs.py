@@ -28,7 +28,7 @@ class _Defaults:
     def __setattr__(self, name: str, value: Any) -> None:
         raise ValueError("Defaults cannot be overwritten manually! Please use `configure()`")
 
-    def add(self, name: str, value: Any):
+    def add(self, name: str, value: Any) -> None:
         if name in self._opts:
             raise ValueError(f"{name} is already an existing default!")
         self._opts[name] = value
@@ -44,7 +44,7 @@ class _Defaults:
 
     def configure(self, config: pytest.Config) -> None:
         if config.getini("retries"):
-            Defaults.load_ini(config)
+            self.load_ini(config)
         for key in self._opts:
             if (val := config.getoption(key.lower())) is not None:
                 self._opts[key] = val

@@ -40,7 +40,7 @@ class _Defaults:
         """
         self._opts[RETRIES] = int(config.getini(RETRIES.lower()))
         self._opts[RETRY_DELAY] = float(config.getini(RETRY_DELAY.lower()))
-        self._opts[CUMULATIVE_TIMING] = bool(config.getini(CUMULATIVE_TIMING.lower()))
+        self._opts[CUMULATIVE_TIMING] = config.getini(CUMULATIVE_TIMING.lower())
 
     def configure(self, config: pytest.Config) -> None:
         if config.getini("retries"):

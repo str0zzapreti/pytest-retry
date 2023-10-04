@@ -679,7 +679,7 @@ def test_configuration_by_ini_file(testdir):
         [pytest]
         retries = 2
         retry_delay = 0.5
-        cumulative_timing = True
+        cumulative_timing = true
         """
     )
     testdir.makepyfile(

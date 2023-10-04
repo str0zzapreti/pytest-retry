@@ -318,7 +318,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
     parser.addini("retries", RETRIES_HELP_TEXT, default=0, type="string")
     parser.addini("retry_delay", DELAY_HELP_TEXT, default=0, type="string")
-    parser.addini("cumulative_timing", TIMING_HELP_TEXT, default=False, type="string")
+    parser.addini("cumulative_timing", TIMING_HELP_TEXT, default=False, type="bool")
 
 
 def pytest_addhooks(pluginmanager: pytest.PytestPluginManager) -> None:

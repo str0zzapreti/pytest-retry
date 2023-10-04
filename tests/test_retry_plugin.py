@@ -267,10 +267,11 @@ def test_retry_delay_from_command_line_between_attempts(testdir):
             assert len(a) > 2
         """
     )
-    result = testdir.runpytest("--retries", "2", "--retry-delay", "2")
+    result = testdir.runpytest("--retries", "2", "--retry-delay", "0.2")
 
     assert_outcomes(result, passed=1, retried=1)
-    assert result.duration > 4
+    assert result.duration > 0.4
+    assert result.duration < 0.5
 
 
 def test_passing_outcome_is_available_from_item_stash(testdir):
@@ -717,7 +718,7 @@ def test_configuration_by_pyproject_toml_file(testdir):
         """
         [tool.pytest.ini_options]
         retries = 1
-        retry_delay = 2
+        retry_delay = 0.3
         """
     )
     testdir.makepyfile(
@@ -729,7 +730,8 @@ def test_configuration_by_pyproject_toml_file(testdir):
     result = testdir.runpytest()
 
     assert_outcomes(result, passed=0, failed=1, retried=1)
-    assert result.duration > 2
+    assert result.duration > 0.3
+    assert result.duration < 0.4
 
 
 def test_duration_in_overwrite_timings_mode(testdir):
@@ -742,7 +744,7 @@ def test_duration_in_overwrite_timings_mode(testdir):
 
         @pytest.mark.flaky(retries=2)
         def test_eventually_passes():
-            sleep(2 - len(a))
+            sleep(1.5 - len(a))
             a.append(1)
             assert len(a) > 1
         """
@@ -754,7 +756,7 @@ def test_duration_in_overwrite_timings_mode(testdir):
 
         def pytest_report_teststatus(report: pytest.TestReport):
             if report.when == "call" and report.outcome != "retried":
-                assert report.duration < 2
+                assert report.duration < 0.6
         """
     )
     result = testdir.runpytest()

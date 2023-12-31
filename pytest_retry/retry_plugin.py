@@ -2,6 +2,7 @@ import pytest
 import bdb
 from time import sleep
 from io import StringIO
+from logging import LogRecord
 from traceback import format_exception
 from typing import Generator, Optional
 from collections.abc import Iterable
@@ -208,7 +209,8 @@ def pytest_runtest_makereport(
                 attempt=attempts, name=item.name, exc=t_call.excinfo, outcome=2
             )
             # Prevents a KeyError when an error during retry teardown causes a redundant teardown
-            item.stash[caplog_records_key] = {}  # type: ignore
+            empty: dict[str, list[LogRecord]] = {}
+            item.stash[caplog_records_key] = empty
             break
 
         # If teardown passes, send report that the test is being retried

@@ -204,7 +204,7 @@ def test_retry_passes_after_temporary_test_failure_with_flaky_mark(testdir):
     assert_outcomes(result, passed=1, retried=1)
 
 
-def test_retries_if_flaky_mark_is_called_without_options(testdir):
+def test_retries_if_flaky_mark_is_applied_without_options(testdir):
     testdir.makepyfile(
         """
         import pytest
@@ -220,6 +220,37 @@ def test_retries_if_flaky_mark_is_called_without_options(testdir):
     result = testdir.runpytest()
 
     assert_outcomes(result, passed=1, retried=1)
+
+
+def test_fixtures_are_retried_with_test(testdir):
+    testdir.makepyfile(
+        """
+        import pytest
+
+        a = []
+        setup = []
+        teardown = []
+
+        @pytest.fixture()
+        def basic_setup_and_teardown():
+            setup.append(True)
+            yield
+            teardown.append(True)
+
+        @pytest.mark.flaky(retries=2)
+        def test_eventually_passes(basic_setup_and_teardown):
+            a.append(1)
+            assert len(a) > 2
+        
+        
+        def test_setup_and_teardown_reran():
+            assert len(setup) == 3
+            assert len(teardown) == 3
+        """
+    )
+    result = testdir.runpytest()
+
+    assert_outcomes(result, passed=2, failed=0, retried=1)
 
 
 def test_retry_fails_if_temporary_failures_exceed_retry_limit(testdir):

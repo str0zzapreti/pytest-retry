@@ -7,7 +7,7 @@ thereby improving the consistency of the test suite results.
 ## Requirements
 
 pytest-retry is designed for the latest versions of Python and Pytest. Python 3.9+
-and pytest 7.0.0 are required. 
+and pytest 7.0.0+ are required. 
 
 ## Installation
 

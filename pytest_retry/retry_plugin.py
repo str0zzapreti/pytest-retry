@@ -120,9 +120,7 @@ retry_manager = RetryHandler()
 
 
 def has_interactive_exception(call: pytest.CallInfo) -> bool:
-    # Check whether the call raised an exception that should be reported as interactive.
     if call.excinfo is None:
-        # Didn't raise.
         return False
     if isinstance(call.excinfo.value, bdb.BdbQuit):
         # Special control flow exception.
@@ -162,7 +160,7 @@ def pytest_runtest_makereport(
     outcome = yield
     original_report: pytest.TestReport = outcome.get_result()
     retry_manager.record_node_stats(original_report)
-    # Set dynamic outcome for each stage until runtest protocol has completed.
+    # Set dynamic outcome for each stage until runtest protocol has completed
     item.stash[outcome_key] = original_report.outcome
 
     if not should_handle_retry(call):
@@ -203,7 +201,7 @@ def pytest_runtest_makereport(
             ),
             when="teardown",
         )
-        # If teardown fails, break. Flaky teardowns are not acceptable and should raise immediately
+        # If teardown fails, break. Flaky teardowns are unacceptable and should raise immediately
         if t_call.excinfo:
             item.stash[outcome_key] = "failed"
             retry_manager.log_attempt(
@@ -220,8 +218,6 @@ def pytest_runtest_makereport(
             original_report.outcome = "failed"
         retry_manager.log_attempt(attempt=attempts, name=item.name, exc=call.excinfo, outcome=0)
         sleep(delay)
-        # Call _initrequest(). Only way to get the setup to run again
-        item._initrequest()  # type: ignore[attr-defined]
 
         pytest.CallInfo.from_call(lambda: hook.pytest_runtest_setup(item=item), when="setup")
         call = pytest.CallInfo.from_call(lambda: hook.pytest_runtest_call(item=item), when="call")

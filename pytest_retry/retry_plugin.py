@@ -220,6 +220,8 @@ def pytest_runtest_makereport(
             original_report.outcome = "failed"
         retry_manager.log_attempt(attempt=attempts, name=item.name, exc=call.excinfo, outcome=0)
         sleep(delay)
+        # Calling _initrequest() is required to reset fixtures for a retry. Make public pls?
+        item._initrequest()  # type: ignore[attr-defined]
 
         pytest.CallInfo.from_call(lambda: hook.pytest_runtest_setup(item=item), when="setup")
         call = pytest.CallInfo.from_call(lambda: hook.pytest_runtest_call(item=item), when="call")

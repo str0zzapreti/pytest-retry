@@ -241,8 +241,8 @@ def test_fixtures_are_retried_with_test(testdir):
         def test_eventually_passes(basic_setup_and_teardown):
             a.append(1)
             assert len(a) > 2
-        
-        
+
+
         def test_setup_and_teardown_reran():
             assert len(setup) == 3
             assert len(teardown) == 3

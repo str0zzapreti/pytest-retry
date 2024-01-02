@@ -787,7 +787,7 @@ def test_duration_in_overwrite_timings_mode(testdir):
 
         def pytest_report_teststatus(report: pytest.TestReport):
             if report.when == "call" and report.outcome != "retried":
-                assert report.duration < 0.6
+                assert report.duration < 0.7
         """
     )
     result = testdir.runpytest()

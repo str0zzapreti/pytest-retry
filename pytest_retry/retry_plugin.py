@@ -104,7 +104,7 @@ class RetryHandler:
         if not test_outcomes["call"] or test_outcomes["call"][-1] == "failed":
             return "failed"
         if "failed" in test_outcomes["teardown"]:
-            return "failed"
+            return "failed"   # is there always a teardown? can probably just simplify this to return test_outcomes["teardown"] as a fallthrough
         return "passed"
 
     def simple_duration(self, item: pytest.Item) -> float:
@@ -281,6 +281,10 @@ def pytest_configure(config: pytest.Config) -> None:
     if config.getoption("verbose"):
         # if pytest config has -v enabled, then don't limit traceback length
         retry_manager.trace_limit = None
+    if not (hasattr(config, "workerinput")) or not (hasattr(config, "slaveinput")):
+        retry_manager.name = "mainboi"
+    else:
+        retry_manager.name = "clientboi"
     Defaults.configure(config)
     Defaults.add("FILTERED_EXCEPTIONS", config.hook.pytest_set_filtered_exceptions() or [])
     Defaults.add("EXCLUDED_EXCEPTIONS", config.hook.pytest_set_excluded_exceptions() or [])

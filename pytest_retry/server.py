@@ -3,71 +3,60 @@ import threading
 from io import StringIO
 from _pytest.terminal import TerminalReporter
 
-# check if xdist installed (set min version to 1.20, don't worry about older compat)
-# Set xdist hooks if installed?
-# Look at pytest_configure_node
-# Set up two handlers, one for server and one for clients
-# server handler probably needs threading
-# Set up sockets with send and recieve. Might want to look at some docs on this
-# assign handler to rerun process based on server or client
-# When setting reports, client should send via socket while server should just set normally
-# server should also be set up to receive (via threading) and should log those entries as well
-
-
-# pieces:
-
-CONN_PORT = 0
+CONN_PORT = 9009
 
 
 class ReportHandler:
     def __init__(self):
         self.stream = StringIO()
 
-    def generate_report(self, terminalreporter: TerminalReporter) -> None:
-        contents = self.stream.getvalue()
-        if not contents:
-            return
+    def build_retry_report(self, terminalreporter: TerminalReporter) -> None:
+        pass
 
-        terminalreporter.write("\n")
-        terminalreporter.section(
-            "the following tests were retried", sep="=", bold=True, yellow=True
-        )
-        terminalreporter.write(contents)
-        terminalreporter.section("end of test retry report", sep="=", bold=True, yellow=True)
-        terminalreporter.write("\n")
+    def record_attempt(self, lines: list[str]) -> None:
+        pass
 
 
-class ReportServer:
+class OfflineReporter(ReportHandler):
     def __init__(self):
-        self.stream = StringIO()
+        super().__init__()
+
+    def record_attempt(self, lines: list[str]) -> None:
+        self.stream.writelines(lines)
+
+
+class ReportServer(ReportHandler):
+    def __init__(self):
+        super().__init__()
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.setblocking(True)
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind(("localhost", CONN_PORT))
+        t = threading.Thread(target=self.run_server, daemon=True)
+        t.start()
+
+    def run_server(self):
         self.sock.listen()
         while True:
             conn, _ = self.sock.accept()
+
             while True:
-                report_chunk = conn.recv(1024)
-                if not report_chunk:
+                chunk = conn.recv(128)
+                if not chunk:
                     break
-                self.stream.write(report_chunk.decode())
-
-    def generate_report(self, terminalreporter: TerminalReporter) -> None:
-        terminalreporter.write("\n")
-        terminalreporter.section(
-            "the following tests were retried", sep="=", bold=True, yellow=True
-        )
-        terminalreporter.write(self.stream.getvalue())
-        terminalreporter.section("end of test retry report", sep="=", bold=True, yellow=True)
-        terminalreporter.write("\n")
+                self.stream.write(chunk.decode("utf-8"))
 
 
-class ReportClient:
+class ClientReporter(ReportHandler):
     def __init__(self):
-        self.stream = StringIO()
+        super().__init__()
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setblocking(True)
+        self.sock.connect(("localhost", CONN_PORT))
 
-    def generate_report(self, _) -> None:
-        self.sock.sendall(self.stream)
+    def record_attempt(self, lines: list[str]) -> None:
+        self.stream.writelines(lines)
+        # Group reports for each item together before sending and resetting stream
+        if not lines[1].endswith("Retrying!\n\t"):
+            self.sock.sendall(self.stream.getvalue().encode("utf-8"))
+            self.stream = StringIO()

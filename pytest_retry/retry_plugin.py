@@ -1,12 +1,12 @@
 import pytest
 import bdb
 from time import sleep
-from io import StringIO
 from logging import LogRecord
 from traceback import format_exception
 from typing import Generator, Optional
 from collections.abc import Iterable
 from pytest_retry.configs import Defaults
+from pytest_retry.server import ReportHandler, OfflineReporter, ReportServer, ClientReporter
 from _pytest.terminal import TerminalReporter
 from _pytest.logging import caplog_records_key
 
@@ -15,6 +15,10 @@ outcome_key = pytest.StashKey[str]()
 attempts_key = pytest.StashKey[int]()
 duration_key = pytest.StashKey[float]()
 stages = ("setup", "call", "teardown")
+RETRY = 0
+FAIL = 1
+EXIT = 2
+PASS = 3
 
 
 class ConfigurationError(Exception):
@@ -49,44 +53,49 @@ class ExceptionFilter:
         return bool(self.filter)
 
 
-class RetryHandler:
+class RetryManager:
     """
     Stores statistics and reports for flaky tests and fixtures which have
     failed at least once during the test session and need to be retried
     """
 
     def __init__(self) -> None:
-        self.stream = StringIO()
+        self.reporter: ReportHandler = OfflineReporter()
         self.trace_limit: Optional[int] = -1
         self.node_stats: dict[str, dict] = {}
         self.messages = (
             " failed on attempt {attempt}! Retrying!\n\t",
             " failed after {attempt} attempts!\n\t",
             " teardown failed on attempt {attempt}! Exiting immediately!\n\t",
+            " passed on attempt {attempt}!\n\t",
         )
 
     def log_attempt(
-        self, attempt: int, name: str, exc: Optional[pytest.ExceptionInfo], outcome: int
+        self, attempt: int, name: str, exc: Optional[pytest.ExceptionInfo], result: int
     ) -> None:
-        message = self.messages[outcome].format(attempt=attempt)
-        err = (exc.type, exc.value, exc.tb)  # type: ignore
-        formatted_trace = (
-            "".join(format_exception(*err, limit=self.trace_limit)).replace("\n", "\n\t").rstrip()
-        )
-        self.stream.writelines([f"\t{name}", message, formatted_trace, "\n\n"])
+        message = self.messages[result].format(attempt=attempt)
+        formatted_trace = ""
+        if exc:
+            err = (exc.type, exc.value, exc.tb)
+            formatted_trace = (
+                formatted_trace.join(format_exception(*err, limit=self.trace_limit))
+                .replace("\n", "\n\t")
+                .rstrip()
+            )
+        self.reporter.record_attempt([f"\t{name}", message, formatted_trace, "\n\n"])
 
-    def add_retry_report(self, terminalreporter: TerminalReporter) -> None:
-        contents = self.stream.getvalue()
+    def build_retry_report(self, terminal_reporter: TerminalReporter) -> None:
+        contents = self.reporter.stream.getvalue()
         if not contents:
             return
 
-        terminalreporter.write("\n")
-        terminalreporter.section(
+        terminal_reporter.write("\n")
+        terminal_reporter.section(
             "the following tests were retried", sep="=", bold=True, yellow=True
         )
-        terminalreporter.write(contents)
-        terminalreporter.section("end of test retry report", sep="=", bold=True, yellow=True)
-        terminalreporter.write("\n")
+        terminal_reporter.write(contents)
+        terminal_reporter.section("end of test retry report", sep="=", bold=True, yellow=True)
+        terminal_reporter.write("\n")
 
     def record_node_stats(self, report: pytest.TestReport) -> None:
         self.node_stats[report.nodeid]["outcomes"][report.when].append(report.outcome)
@@ -103,8 +112,9 @@ class RetryHandler:
                 return outcome
         if not test_outcomes["call"] or test_outcomes["call"][-1] == "failed":
             return "failed"
+        # can probably just simplify this to return test_outcomes["teardown"] as a fallthrough
         if "failed" in test_outcomes["teardown"]:
-            return "failed"   # is there always a teardown? can probably just simplify this to return test_outcomes["teardown"] as a fallthrough
+            return "failed"
         return "passed"
 
     def simple_duration(self, item: pytest.Item) -> float:
@@ -117,7 +127,7 @@ class RetryHandler:
         return len(self.node_stats[item.nodeid]["outcomes"]["call"])
 
 
-retry_manager = RetryHandler()
+retry_manager = RetryManager()
 
 
 def has_interactive_exception(call: pytest.CallInfo) -> bool:
@@ -206,7 +216,7 @@ def pytest_runtest_makereport(
         if t_call.excinfo:
             item.stash[outcome_key] = "failed"
             retry_manager.log_attempt(
-                attempt=attempts, name=item.name, exc=t_call.excinfo, outcome=2
+                attempt=attempts, name=item.name, exc=t_call.excinfo, result=EXIT
             )
             # Prevents a KeyError when an error during retry teardown causes a redundant teardown
             empty: dict[str, list[LogRecord]] = {}
@@ -218,7 +228,7 @@ def pytest_runtest_makereport(
             original_report.outcome = "retried"  # type: ignore
             hook.pytest_runtest_logreport(report=original_report)
             original_report.outcome = "failed"
-        retry_manager.log_attempt(attempt=attempts, name=item.name, exc=call.excinfo, outcome=0)
+        retry_manager.log_attempt(attempt=attempts, name=item.name, exc=call.excinfo, result=RETRY)
         sleep(delay)
         # Calling _initrequest() is required to reset fixtures for a retry. Make public pls?
         item._initrequest()  # type: ignore[attr-defined]
@@ -250,15 +260,17 @@ def pytest_runtest_makereport(
                     retry_manager.node_stats[original_report.nodeid]["durations"]["call"]
                 )
 
-            if retry_report.failed:
-                retry_manager.log_attempt(
-                    attempt=attempts, name=item.name, exc=call.excinfo, outcome=1
-                )
+            retry_manager.log_attempt(
+                attempt=attempts,
+                name=item.name,
+                exc=call.excinfo,
+                result=FAIL if retry_report.failed else PASS,
+            )
             break
 
 
 def pytest_terminal_summary(terminalreporter: TerminalReporter) -> None:
-    retry_manager.add_retry_report(terminalreporter)
+    retry_manager.build_retry_report(terminalreporter)
 
 
 def pytest_report_teststatus(
@@ -281,13 +293,13 @@ def pytest_configure(config: pytest.Config) -> None:
     if config.getoption("verbose"):
         # if pytest config has -v enabled, then don't limit traceback length
         retry_manager.trace_limit = None
-    if not (hasattr(config, "workerinput")) or not (hasattr(config, "slaveinput")):
-        retry_manager.name = "mainboi"
-    else:
-        retry_manager.name = "clientboi"
     Defaults.configure(config)
     Defaults.add("FILTERED_EXCEPTIONS", config.hook.pytest_set_filtered_exceptions() or [])
     Defaults.add("EXCLUDED_EXCEPTIONS", config.hook.pytest_set_excluded_exceptions() or [])
+    if config.getoption("numprocesses"):
+        retry_manager.reporter = ReportServer()
+    elif hasattr(config, "workerinput"):
+        retry_manager.reporter = ClientReporter()
 
 
 RETRIES_HELP_TEXT = "number of times to retry failed tests. Defaults to 0."

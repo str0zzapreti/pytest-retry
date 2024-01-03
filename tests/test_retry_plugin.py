@@ -1,5 +1,11 @@
 from pytest import mark
 
+try:
+    import xdist
+    xdist_installed = True
+except ImportError:
+    xdist_installed = False
+
 pytest_plugins = ["pytester"]
 
 
@@ -851,3 +857,34 @@ def test_conditional_flaky_marks_evaluate_correctly(testdir):
     result = testdir.runpytest()
 
     assert_outcomes(result, passed=2, failed=1, retried=2)
+
+
+@mark.skipif(xdist_installed is False, reason="Only run if xdist is installed locally")
+def test_xdist_reporting_compatability(testdir):
+    testdir.makepyfile(
+        """
+        import pytest
+
+        a = 0
+        b = 0
+
+        def test_flaky() -> None:
+            global a
+
+            a += 1
+            assert a == 3
+
+        def test_moar_flaky() -> None:
+            global b
+
+            b += 1
+            assert b == 2
+        """
+    )
+    result = testdir.runpytest("-n", "2", "--retries", "3")
+
+    assert "\ttest_flaky failed on attempt 1! Retrying!" in result.outlines
+    assert "\ttest_flaky failed on attempt 2! Retrying!" in result.outlines
+    assert "\ttest_flaky passed on attempt 3!" in result.outlines
+    assert "\ttest_moar_flaky failed on attempt 1! Retrying!" in result.outlines
+    assert "\ttest_moar_flaky passed on attempt 2!" in result.outlines

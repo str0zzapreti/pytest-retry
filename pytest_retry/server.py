@@ -7,7 +7,7 @@ CONN_PORT = 9009
 
 
 class ReportHandler:
-    def __init__(self):
+    def __init__(self) -> None:
         self.stream = StringIO()
 
     def build_retry_report(self, terminalreporter: TerminalReporter) -> None:
@@ -18,7 +18,7 @@ class ReportHandler:
 
 
 class OfflineReporter(ReportHandler):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
 
     def record_attempt(self, lines: list[str]) -> None:
@@ -26,7 +26,7 @@ class OfflineReporter(ReportHandler):
 
 
 class ReportServer(ReportHandler):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setblocking(True)
@@ -35,7 +35,7 @@ class ReportServer(ReportHandler):
         t = threading.Thread(target=self.run_server, daemon=True)
         t.start()
 
-    def run_server(self):
+    def run_server(self) -> None:
         self.sock.listen()
         while True:
             conn, _ = self.sock.accept()
@@ -48,7 +48,7 @@ class ReportServer(ReportHandler):
 
 
 class ClientReporter(ReportHandler):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setblocking(True)

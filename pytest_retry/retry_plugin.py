@@ -296,7 +296,7 @@ def pytest_configure(config: pytest.Config) -> None:
     Defaults.configure(config)
     Defaults.add("FILTERED_EXCEPTIONS", config.hook.pytest_set_filtered_exceptions() or [])
     Defaults.add("EXCLUDED_EXCEPTIONS", config.hook.pytest_set_excluded_exceptions() or [])
-    if config.getoption("numprocesses"):
+    if config.getoption("numprocesses", False):
         retry_manager.reporter = ReportServer()
     elif hasattr(config, "workerinput"):
         retry_manager.reporter = ClientReporter()

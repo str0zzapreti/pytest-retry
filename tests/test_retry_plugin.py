@@ -1,7 +1,7 @@
 from pytest import mark
 
 try:
-    import xdist  # noqa: F401
+    from xdist import __version__  # noqa: F401
 
     xdist_installed = True
 except ImportError:

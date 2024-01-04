@@ -3,7 +3,7 @@ import bdb
 from time import sleep
 from logging import LogRecord
 from traceback import format_exception
-from typing import Generator, Optional
+from typing import Any, Generator, Optional
 from collections.abc import Iterable
 from pytest_retry.configs import Defaults
 from pytest_retry.server import ReportHandler, OfflineReporter, ReportServer, ClientReporter
@@ -14,6 +14,7 @@ from _pytest.logging import caplog_records_key
 outcome_key = pytest.StashKey[str]()
 attempts_key = pytest.StashKey[int]()
 duration_key = pytest.StashKey[float]()
+server_port_key = pytest.StashKey[int]()
 stages = ("setup", "call", "teardown")
 RETRY = 0
 FAIL = 1
@@ -281,6 +282,13 @@ def pytest_report_teststatus(
     return None
 
 
+class XdistHook:
+    @staticmethod
+    def pytest_configure_node(node: Any) -> None:  # Xdist WorkerController instance
+        # Tells each worker node which port was randomly assigned to the retry server
+        node.workerinput["server_port"] = node.config.stash[server_port_key]
+
+
 def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers",
@@ -296,10 +304,13 @@ def pytest_configure(config: pytest.Config) -> None:
     Defaults.configure(config)
     Defaults.add("FILTERED_EXCEPTIONS", config.hook.pytest_set_filtered_exceptions() or [])
     Defaults.add("EXCLUDED_EXCEPTIONS", config.hook.pytest_set_excluded_exceptions() or [])
-    if config.getoption("numprocesses", False):
+    if config.pluginmanager.has_plugin("xdist") and config.getoption("numprocesses", False):
+        config.pluginmanager.register(XdistHook())
         retry_manager.reporter = ReportServer()
+        config.stash[server_port_key] = retry_manager.reporter.initialize_server()
     elif hasattr(config, "workerinput"):
-        retry_manager.reporter = ClientReporter()
+        # pytest-xdist doesn't use the config stash, so have to ignore a type error here
+        retry_manager.reporter = ClientReporter(config.workerinput["server_port"])  # type: ignore
 
 
 RETRIES_HELP_TEXT = "number of times to retry failed tests. Defaults to 0."

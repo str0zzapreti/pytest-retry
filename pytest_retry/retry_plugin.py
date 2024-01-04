@@ -309,7 +309,8 @@ def pytest_configure(config: pytest.Config) -> None:
         retry_manager.reporter = ReportServer()
         config.stash[server_port_key] = retry_manager.reporter.initialize_server()
     elif hasattr(config, "workerinput"):
-        retry_manager.reporter = ClientReporter(config.workerinput["server_port"])
+        # pytest-xdist doesn't use the config stash, so have to ignore a type error here
+        retry_manager.reporter = ClientReporter(config.workerinput["server_port"])  # type: ignore
 
 
 RETRIES_HELP_TEXT = "number of times to retry failed tests. Defaults to 0."

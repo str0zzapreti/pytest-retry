@@ -3,7 +3,7 @@ import bdb
 from time import sleep
 from logging import LogRecord
 from traceback import format_exception
-from typing import Generator, Optional
+from typing import Any, Generator, Optional
 from collections.abc import Iterable
 from pytest_retry.configs import Defaults
 from pytest_retry.server import ReportHandler, OfflineReporter, ReportServer, ClientReporter
@@ -284,7 +284,7 @@ def pytest_report_teststatus(
 
 class XdistHook:
     @staticmethod
-    def pytest_configure_node(node):
+    def pytest_configure_node(node: Any) -> None:  # Xdist WorkerController instance
         # Tells each worker node which port was randomly assigned to the retry server
         node.workerinput["server_port"] = node.config.stash[server_port_key]
 

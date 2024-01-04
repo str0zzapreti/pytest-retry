@@ -3,8 +3,6 @@ import threading
 from io import StringIO
 from _pytest.terminal import TerminalReporter
 
-CONN_PORT = 9009
-
 
 class ReportHandler:
     def __init__(self) -> None:
@@ -31,9 +29,12 @@ class ReportServer(ReportHandler):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setblocking(True)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.sock.bind(("localhost", CONN_PORT))
+
+    def initialize_server(self) -> int:
+        self.sock.bind(("localhost", 0))
         t = threading.Thread(target=self.run_server, daemon=True)
         t.start()
+        return self.sock.getsockname()[-1]
 
     def run_server(self) -> None:
         self.sock.listen()
@@ -48,11 +49,11 @@ class ReportServer(ReportHandler):
 
 
 class ClientReporter(ReportHandler):
-    def __init__(self) -> None:
+    def __init__(self, port: int) -> None:
         super().__init__()
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setblocking(True)
-        self.sock.connect(("localhost", CONN_PORT))
+        self.sock.connect(("localhost", port))
 
     def record_attempt(self, lines: list[str]) -> None:
         self.stream.writelines(lines)

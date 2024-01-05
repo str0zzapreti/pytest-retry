@@ -861,7 +861,7 @@ def test_conditional_flaky_marks_evaluate_correctly(testdir):
 
 
 @mark.skipif(xdist_installed is False, reason="Only run if xdist is installed locally")
-def test_xdist_reporting_compatability(testdir):
+def test_xdist_reporting_compatibility(testdir):
     testdir.makepyfile(
         """
         import pytest

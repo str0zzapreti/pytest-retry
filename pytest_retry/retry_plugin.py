@@ -1,3 +1,5 @@
+import os
+import pathlib
 import pytest
 import bdb
 from time import sleep
@@ -209,7 +211,7 @@ def pytest_runtest_makereport(
         t_call = pytest.CallInfo.from_call(
             lambda: hook.pytest_runtest_teardown(
                 item=item,
-                nextitem=pytest.Item.from_parent(item.session, name="fakeboi"),
+                nextitem=pytest.Module.from_parent(parent=item.session, path=pathlib.Path(os.devnull)),
             ),
             when="teardown",
         )

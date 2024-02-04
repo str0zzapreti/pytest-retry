@@ -204,12 +204,12 @@ def pytest_runtest_makereport(
 
     while True:
         # Default teardowns are already excluded, so this must be the `call` stage
-        # Try preliminary teardown using a fake item to ensure every local fixture (i.e.
+        # Try preliminary teardown using a fake class to ensure every local fixture (i.e.
         # excluding session) is torn down. Yes, including module and class fixtures
         t_call = pytest.CallInfo.from_call(
             lambda: hook.pytest_runtest_teardown(
                 item=item,
-                nextitem=pytest.Item.from_parent(item.session, name="fakeboi"),
+                nextitem=pytest.Class.from_parent(item.session, name="Fakeboi"),
             ),
             when="teardown",
         )

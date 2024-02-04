@@ -260,6 +260,70 @@ def test_fixtures_are_retried_with_test(testdir):
     assert_outcomes(result, passed=2, failed=0, retried=1)
 
 
+def test_retry_executes_class_scoped_fixture(testdir):
+    testdir.makepyfile(
+        """
+        import pytest
+
+        a = []
+        setup = []
+        teardown = []
+
+        @pytest.fixture(scope="class")
+        def basic_setup_and_teardown():
+            setup.append(True)
+            yield
+            teardown.append(True)
+
+        @pytest.mark.usefixtures("basic_setup_and_teardown")
+        class TestClassFixtures:
+            @pytest.mark.flaky(retries=2)
+            def test_eventually_passes(self):
+                a.append(1)
+                assert len(a) > 2
+
+
+        def test_setup_and_teardown_reran():
+            assert len(setup) == 3
+            assert len(teardown) == 3
+        """
+    )
+    result = testdir.runpytest()
+
+    assert_outcomes(result, passed=2, failed=0, retried=1)
+
+
+def test_retry_executes_module_scoped_fixture(testdir):
+    testdir.makepyfile(
+        """
+        import pytest
+
+        a = []
+        setup = []
+        teardown = []
+
+        @pytest.fixture(scope="module")
+        def basic_setup_and_teardown():
+            setup.append(True)
+            yield
+            teardown.append(True)
+
+        @pytest.mark.flaky(retries=2)
+        def test_eventually_passes(basic_setup_and_teardown):
+            a.append(1)
+            assert len(a) > 2
+
+
+        def test_setup_and_teardown_reran():
+            assert len(setup) == 3
+            assert len(teardown) == 2
+        """
+    )
+    result = testdir.runpytest()
+
+    assert_outcomes(result, passed=2, failed=0, retried=1)
+
+
 def test_retry_fails_if_temporary_failures_exceed_retry_limit(testdir):
     testdir.makepyfile(
         """

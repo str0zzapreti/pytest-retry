@@ -274,15 +274,15 @@ def test_retry_executes_class_scoped_fixture(testdir):
             setup.append(True)
             yield
             teardown.append(True)
-        
+
         @pytest.mark.usefixtures("basic_setup_and_teardown")
         class TestClassFixtures:
             @pytest.mark.flaky(retries=2)
             def test_eventually_passes(self):
                 a.append(1)
                 assert len(a) > 2
-    
-    
+
+
         def test_setup_and_teardown_reran():
             assert len(setup) == 3
             assert len(teardown) == 3

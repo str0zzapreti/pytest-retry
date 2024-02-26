@@ -83,7 +83,7 @@ cumulative_timing = false
 ```
 
 _config.ini/tox.ini_
-```toml
+```ini
 [pytest]
 retries = 2
 retry_delay = 0.5

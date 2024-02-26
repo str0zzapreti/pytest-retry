@@ -12,7 +12,7 @@ and pytest 7.0.0+ are required.
 ## Installation
 
 Use pip to install pytest-retry:
-```
+```bash
 $ pip install pytest-retry
 ```
 
@@ -27,7 +27,7 @@ Run Pytest with the command line argument --retries in order to retry every test
 the event of a failure. The following example will retry each failed up to two times
 before proceeding to the next test:
 
-```
+```bash
 $ python -m pytest --retries 2
 ```
 
@@ -36,7 +36,7 @@ a fixed delay (in seconds) between each attempt when a test fails. This can be u
 if the test failures are due to intermittent environment issues which clear up after
 a few seconds
 
-```
+```bash
 $ python -m pytest --retries 2 --retry-delay 5
 ```
 
@@ -48,7 +48,7 @@ conftest.py file and return a list of exception types. Note: these hooks are
 mutually exclusive and cannot both be defined at the same time.
 
 Example:
-```
+```py
 def pytest_set_excluded_exceptions():
     """
     All tests will be retried unless they fail due to an AssertionError or CustomError
@@ -61,7 +61,7 @@ be `overwrite` (default) or `cumulative`. With cumulative timing, the duration o
 each test attempt is summed for the reported overall test duration. The default
 behavior simply reports the timing of the final attempt.
 
-```
+```bash
 $ python -m pytest --retries 2 --cumulative-timing 1
 ```
 
@@ -75,7 +75,7 @@ precedence over options specified in one of these config files. Here are some
 sample configs that you can copy into your project to get started:
 
 _pyproject.toml_
-```
+```toml
 [tool.pytest.ini_options]
 retries = 2
 retry_delay = 0.5
@@ -83,7 +83,7 @@ cumulative_timing = false
 ```
 
 _config.ini/tox.ini_
-```
+```ini
 [pytest]
 retries = 2
 retry_delay = 0.5
@@ -96,7 +96,7 @@ Mark individual tests as 'flaky' to retry them when they fail. If no command lin
 arguments are passed, only the marked tests will be retried. The default values
 are 1 retry attempt with a 0-second delay
 
-```
+```py
 @pytest.mark.flaky
 def test_unreliable_service():
     ...
@@ -105,7 +105,7 @@ def test_unreliable_service():
 The number of times each test will be retried and/or the delay can be manually
 specified as well
 
-```
+```py
 @pytest.mark.flaky(retries=3, delay=1)
 def test_unreliable_service():
     # This test will be retried up to 3 times (4 attempts total) with a
@@ -126,7 +126,7 @@ listed exceptions.
 If the exception for a subsequent attempt changes and no longer matches the filter,
 no further attempts will be made and the test will immediately fail.
 
-```
+```py
 @pytest.mark.flaky(retries=2, only_on=[ValueError, IndexError])
 def test_unreliable_service():
     # This test will only be retried if it fails due to raising a ValueError
@@ -140,7 +140,7 @@ to your retries. The test will only be retried if `condition` is `True`. Note, t
 matching command line option for `condition`, but if you need to globally apply this type of logic
 to all of your tests, consider invoking the `pytest_collection_modifyitems` hook.
 
-```
+```py
 @pytest.mark.flaky(retries=2, condition=sys.platform.startswith('win32'))
 def test_only_flaky_on_some_systems():
     # This test will only be retried if sys.platform.startswith('win32') evaluates to `True`
@@ -150,7 +150,7 @@ Finally, there is a flaky mark argument for the test timing method, which can ei
 be `overwrite` (default) or `cumulative`. See **Command Line** > **Advanced Options** 
 for more information
 
-```
+```py
 @pytest.mark.flaky(timing='overwrite')
 def test_unreliable_service():
     ...

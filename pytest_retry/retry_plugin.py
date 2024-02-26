@@ -1,3 +1,4 @@
+import sys
 import pytest
 import bdb
 from time import sleep
@@ -64,6 +65,8 @@ class RetryManager:
         self.reporter: ReportHandler = OfflineReporter()
         self.trace_limit: Optional[int] = -1
         self.node_stats: dict[str, dict] = {}
+        self.max_global_retries = sys.maxsize
+        self.retried = 0
         self.messages = (
             " failed on attempt {attempt}! Retrying!\n\t",
             " failed after {attempt} attempts!\n\t",
@@ -248,8 +251,10 @@ def pytest_runtest_makereport(
         should_keep_retrying = (
             not retry_report.passed
             and attempts <= retries
+            and (attempts + retry_manager.retried) < retry_manager.max_global_retries
             and exception_filter(call.excinfo.type)  # type: ignore
         )
+        print('attempts: {}, should_keep_retrying: {}'.format(attempts, should_keep_retrying))
 
         if not should_keep_retrying:
             original_report.outcome = retry_report.outcome
@@ -301,6 +306,11 @@ def pytest_configure(config: pytest.Config) -> None:
     if config.getoption("verbose"):
         # if pytest config has -v enabled, then don't limit traceback length
         retry_manager.trace_limit = None
+
+    global_retries = config.getoption("max_global_retries")
+
+    if global_retries:
+        retry_manager.max_global_retries = global_retries
     Defaults.configure(config)
     Defaults.add("FILTERED_EXCEPTIONS", config.hook.pytest_set_filtered_exceptions() or [])
     Defaults.add("EXCLUDED_EXCEPTIONS", config.hook.pytest_set_excluded_exceptions() or [])
@@ -314,6 +324,7 @@ def pytest_configure(config: pytest.Config) -> None:
 
 
 RETRIES_HELP_TEXT = "number of times to retry failed tests. Defaults to 0."
+GLOBAL_RETRIES_HELP_TEXT = "number of times to retry failed tests ,globally. Defaults to 0."
 DELAY_HELP_TEXT = "configure a delay (in seconds) between retries."
 TIMING_HELP_TEXT = "if True, retry duration will be included in overall reported test duration"
 
@@ -330,6 +341,13 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help=RETRIES_HELP_TEXT,
     )
     group.addoption(
+        "--max-global-retries",
+        action="store",
+        dest="max_global_retries",
+        type=int,
+        help=GLOBAL_RETRIES_HELP_TEXT,
+    )
+    group.addoption(
         "--retry-delay",
         action="store",
         dest="retry_delay",
@@ -344,6 +362,7 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help=TIMING_HELP_TEXT,
     )
     parser.addini("retries", RETRIES_HELP_TEXT, default=0, type="string")
+    parser.addini("global_retries", GLOBAL_RETRIES_HELP_TEXT, default=0, type="string")
     parser.addini("retry_delay", DELAY_HELP_TEXT, default=0, type="string")
     parser.addini("cumulative_timing", TIMING_HELP_TEXT, default=False, type="bool")
 

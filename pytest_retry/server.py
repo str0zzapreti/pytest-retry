@@ -56,12 +56,7 @@ class ClientReporter(ReportHandler):
         self.sock.connect(("localhost", port))
 
     def __del__(self) -> None:
-        try:
-            self.sock.shutdown(socket.SHUT_WR)
-        except OSError:
-            pass
-        finally:
-            self.sock.close()
+        self.sock.close()
 
     def record_attempt(self, lines: list[str]) -> None:
         self.stream.writelines(lines)

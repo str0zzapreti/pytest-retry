@@ -1,15 +1,11 @@
 import socket
 import threading
 from io import StringIO
-from _pytest.terminal import TerminalReporter
 
 
 class ReportHandler:
     def __init__(self) -> None:
         self.stream = StringIO()
-
-    def build_retry_report(self, terminalreporter: TerminalReporter) -> None:
-        pass
 
     def record_attempt(self, lines: list[str]) -> None:
         pass
@@ -30,6 +26,9 @@ class ReportServer(ReportHandler):
         self.sock.setblocking(True)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
+    def __del__(self) -> None:
+        self.sock.close()
+
     def initialize_server(self) -> int:
         self.sock.bind(("localhost", 0))
         t = threading.Thread(target=self.run_server, daemon=True)
@@ -41,11 +40,12 @@ class ReportServer(ReportHandler):
         while True:
             conn, _ = self.sock.accept()
 
-            while True:
-                chunk = conn.recv(128)
-                if not chunk:
-                    break
-                self.stream.write(chunk.decode("utf-8"))
+            with conn:
+                while True:
+                    chunk = conn.recv(4096)
+                    if not chunk:
+                        break
+                    self.stream.write(chunk.decode("utf-8"))
 
 
 class ClientReporter(ReportHandler):
@@ -54,6 +54,14 @@ class ClientReporter(ReportHandler):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setblocking(True)
         self.sock.connect(("localhost", port))
+
+    def __del__(self) -> None:
+        try:
+            self.sock.shutdown(socket.SHUT_WR)
+        except OSError:
+            pass
+        finally:
+            self.sock.close()
 
     def record_attempt(self, lines: list[str]) -> None:
         self.stream.writelines(lines)

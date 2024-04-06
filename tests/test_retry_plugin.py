@@ -1,3 +1,5 @@
+import warnings
+
 from pytest import mark
 
 try:
@@ -8,6 +10,8 @@ except ImportError:
     xdist_installed = False
 
 pytest_plugins = ["pytester"]
+
+xdist_test_marker = mark.skipif(not xdist_installed, reason="Only run if xdist is installed locally")
 
 
 def check_outcome_field(outcomes, field_name, expected_value):
@@ -924,8 +928,8 @@ def test_conditional_flaky_marks_evaluate_correctly(testdir):
     assert_outcomes(result, passed=2, failed=1, retried=2)
 
 
-@mark.skipif(xdist_installed is False, reason="Only run if xdist is installed locally")
-def test_xdist_reporting_compatability(testdir):
+@xdist_test_marker
+def test_xdist_reporting_compatibility(testdir):
     testdir.makepyfile(
         """
         import pytest
@@ -953,3 +957,60 @@ def test_xdist_reporting_compatability(testdir):
     assert "\ttest_flaky passed on attempt 3!" in result.outlines
     assert "\ttest_moar_flaky failed on attempt 1! Retrying!" in result.outlines
     assert "\ttest_moar_flaky passed on attempt 2!" in result.outlines
+
+
+@xdist_test_marker
+def test_xdist_resources_properly_closed_server_side(testdir):
+    # TODO: This test works for the sockets opened in the main process,
+    #       but there is no way to catch them inside the workers
+    #       (or at least, the author of this test didn't find it)
+
+    testdir.makepyfile(
+        """
+        import pytest
+        import warnings
+
+        class TestWarning(Warning):
+            pass
+        
+        a = 0
+        b = 0
+
+        def func_a_that_randomly_warns():
+            global a
+
+            a += 1
+            if a == 3:
+                warnings.warn("Test", category=TestWarning)
+
+        def func_b_that_randomly_warns():
+            global b
+
+            b += 1
+            if b == 2:
+                warnings.warn("Test", category=TestWarning)
+
+        def test_flaky_a():
+
+            with pytest.warns(TestWarning):
+                func_a_that_randomly_warns()
+
+        def test_flaky_b():
+
+            with pytest.warns(TestWarning):
+                func_b_that_randomly_warns()
+        """
+    )
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", ResourceWarning)
+
+        # Run tests in the current process in order to apply
+        # warnings.catch_warnings() context
+        result = testdir.runpytest_inprocess("-n", "2", "--retries", "3")
+
+    assert "\ttest_flaky_a failed on attempt 1! Retrying!" in result.outlines
+    assert "\ttest_flaky_a failed on attempt 2! Retrying!" in result.outlines
+    assert "\ttest_flaky_a passed on attempt 3!" in result.outlines
+    assert "\ttest_flaky_b failed on attempt 1! Retrying!" in result.outlines
+    assert "\ttest_flaky_b passed on attempt 2!" in result.outlines

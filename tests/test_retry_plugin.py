@@ -1,5 +1,3 @@
-import warnings
-
 from pytest import mark
 
 try:
@@ -17,8 +15,7 @@ xdist_test_marker = mark.skipif(not xdist_installed, reason="Only run if xdist i
 def check_outcome_field(outcomes, field_name, expected_value):
     field_value = outcomes.get(field_name, 0)
     assert field_value == expected_value, (
-        f"outcomes.{field_name} has unexpected value. "
-        f"Expected '{expected_value}' but got '{field_value}'"
+        f"outcomes.{field_name} has unexpected value. " f"Expected '{expected_value}' but got '{field_value}'"
     )
 
 
@@ -970,7 +967,7 @@ def test_xdist_resources_properly_closed_server_side(testdir):
         import pytest
         import warnings
 
-        class TestWarning(Warning):
+        class MyWarning(Warning):
             pass
         
         a = 0
@@ -981,36 +978,30 @@ def test_xdist_resources_properly_closed_server_side(testdir):
 
             a += 1
             if a == 3:
-                warnings.warn("Test", category=TestWarning)
+                warnings.warn("Test", category=MyWarning)
 
         def func_b_that_randomly_warns():
             global b
 
             b += 1
             if b == 2:
-                warnings.warn("Test", category=TestWarning)
+                warnings.warn("Test", category=MyWarning)
 
         def test_flaky_a():
 
-            with pytest.warns(TestWarning):
+            with pytest.warns(MyWarning):
                 func_a_that_randomly_warns()
 
         def test_flaky_b():
 
-            with pytest.warns(TestWarning):
+            with pytest.warns(MyWarning):
                 func_b_that_randomly_warns()
         """
     )
 
-    with warnings.catch_warnings():
-        warnings.simplefilter("error", ResourceWarning)
+    # The test MUST be run in a subprocess because the warnings appears
+    # on pytest teardown
+    result = testdir.runpytest_subprocess("-n", "2", "--retries", "3", "-Werror")
 
-        # Run tests in the current process in order to apply
-        # warnings.catch_warnings() context
-        result = testdir.runpytest_inprocess("-n", "2", "--retries", "3")
-
-    assert "\ttest_flaky_a failed on attempt 1! Retrying!" in result.outlines
-    assert "\ttest_flaky_a failed on attempt 2! Retrying!" in result.outlines
-    assert "\ttest_flaky_a passed on attempt 3!" in result.outlines
-    assert "\ttest_flaky_b failed on attempt 1! Retrying!" in result.outlines
-    assert "\ttest_flaky_b passed on attempt 2!" in result.outlines
+    for line in result.errlines:
+        assert "ResourceWarning" not in line

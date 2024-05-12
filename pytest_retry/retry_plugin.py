@@ -62,7 +62,7 @@ class RetryManager:
 
     def __init__(self) -> None:
         self.reporter: ReportHandler = OfflineReporter()
-        self.trace_limit: Optional[int] = -1
+        self.trace_limit: Optional[int] = 1
         self.node_stats: dict[str, dict] = {}
         self.messages = (
             " failed on attempt {attempt}! Retrying!\n\t",
@@ -298,9 +298,10 @@ def pytest_configure(config: pytest.Config) -> None:
         "that the test is retried only on those exceptions, or excluding those exceptions. "
         "Any statement which returns a bool can be used as a condition",
     )
-    if config.getoption("verbose"):
-        # if pytest config has -v enabled, then don't limit traceback length
-        retry_manager.trace_limit = None
+    verbosity = config.getoption("verbose")
+    if verbosity:
+        # set trace limit according to verbosity count, or unlimited if 5
+        retry_manager.trace_limit = verbosity if verbosity < 5 else None
     Defaults.configure(config)
     Defaults.add("FILTERED_EXCEPTIONS", config.hook.pytest_set_filtered_exceptions() or [])
     Defaults.add("EXCLUDED_EXCEPTIONS", config.hook.pytest_set_excluded_exceptions() or [])

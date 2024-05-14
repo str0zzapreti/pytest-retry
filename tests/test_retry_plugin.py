@@ -924,6 +924,22 @@ def test_conditional_flaky_marks_evaluate_correctly(testdir):
     assert_outcomes(result, passed=2, failed=1, retried=2)
 
 
+@mark.parametrize('verbosity', ['vv', 'vvv', 'vvvv'])
+def test_stack_trace_depth_uses_verbosity_count(testdir, verbosity):
+    testdir.makepyfile(
+        """
+        a = []
+        def test_eventually_passes():
+            a.append(1)
+            assert len(a) > 1
+        """
+    )
+    result = testdir.runpytest("--retries", "1", f"-{verbosity}")
+
+    assert_outcomes(result, passed=1, retried=1)
+    assert len([line for line in result.outlines if line.startswith('\t  File')]) == len(verbosity)
+
+
 @mark.skipif(xdist_installed is False, reason="Only run if xdist is installed locally")
 def test_xdist_reporting_compatability(testdir):
     testdir.makepyfile(

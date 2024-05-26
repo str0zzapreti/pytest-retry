@@ -9,7 +9,10 @@ except ImportError:
 
 pytest_plugins = ["pytester"]
 
-xdist_test_marker = mark.skipif(not xdist_installed, reason="Only run if xdist is installed locally")
+xdist_test_marker = mark.skipif(
+    not xdist_installed,
+    reason="Only run if xdist is installed locally"
+)
 
 
 def check_outcome_field(outcomes, field_name, expected_value):
@@ -986,7 +989,7 @@ def test_xdist_resources_properly_closed_server_side(testdir):
 
         class MyWarning(Warning):
             pass
-        
+
         a = 0
         b = 0
 

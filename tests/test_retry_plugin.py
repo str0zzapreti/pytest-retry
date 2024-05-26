@@ -15,7 +15,8 @@ xdist_test_marker = mark.skipif(not xdist_installed, reason="Only run if xdist i
 def check_outcome_field(outcomes, field_name, expected_value):
     field_value = outcomes.get(field_name, 0)
     assert field_value == expected_value, (
-        f"outcomes.{field_name} has unexpected value. " f"Expected '{expected_value}' but got '{field_value}'"
+        f"outcomes.{field_name} has unexpected value. "
+        f"Expected '{expected_value}' but got '{field_value}'"
     )
 
 

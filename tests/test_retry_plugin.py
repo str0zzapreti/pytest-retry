@@ -949,8 +949,6 @@ def test_stack_trace_depth_uses_verbosity_count(testdir, verbosity):
 def test_xdist_reporting_compatibility(testdir):
     testdir.makepyfile(
         """
-        import pytest
-
         a = 0
         b = 0
 
@@ -984,44 +982,26 @@ def test_xdist_resources_properly_closed_server_side(testdir):
 
     testdir.makepyfile(
         """
-        import pytest
-        import warnings
-
-        class MyWarning(Warning):
-            pass
-
         a = 0
         b = 0
 
-        def func_a_that_randomly_warns():
+        def test_flaky() -> None:
             global a
 
             a += 1
-            if a == 3:
-                warnings.warn("Test", category=MyWarning)
+            assert a == 3
 
-        def func_b_that_randomly_warns():
+        def test_moar_flaky() -> None:
             global b
 
             b += 1
-            if b == 2:
-                warnings.warn("Test", category=MyWarning)
-
-        def test_flaky_a():
-
-            with pytest.warns(MyWarning):
-                func_a_that_randomly_warns()
-
-        def test_flaky_b():
-
-            with pytest.warns(MyWarning):
-                func_b_that_randomly_warns()
+            assert b == 2
         """
     )
 
-    # The test MUST be run in a subprocess because the warnings appears
+    # The test MUST be run in a subprocess because the warnings appear
     # on pytest teardown
-    result = testdir.runpytest_subprocess("-n", "2", "--retries", "3", "-Werror")
+    result = testdir.runpytest_subprocess("-n", "2", "--retries", "3", "-W", "error")
 
     for line in result.errlines:
         assert "ResourceWarning" not in line

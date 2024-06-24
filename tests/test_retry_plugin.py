@@ -9,6 +9,11 @@ except ImportError:
 
 pytest_plugins = ["pytester"]
 
+xdist_test_marker = mark.skipif(
+    not xdist_installed,
+    reason="Only run if xdist is installed locally"
+)
+
 
 def check_outcome_field(outcomes, field_name, expected_value):
     field_value = outcomes.get(field_name, 0)
@@ -940,12 +945,10 @@ def test_stack_trace_depth_uses_verbosity_count(testdir, verbosity):
     assert len([line for line in result.outlines if line.startswith('\t  File')]) == len(verbosity)
 
 
-@mark.skipif(xdist_installed is False, reason="Only run if xdist is installed locally")
-def test_xdist_reporting_compatability(testdir):
+@xdist_test_marker
+def test_xdist_reporting_compatibility(testdir):
     testdir.makepyfile(
         """
-        import pytest
-
         a = 0
         b = 0
 
@@ -969,3 +972,36 @@ def test_xdist_reporting_compatability(testdir):
     assert "\ttest_flaky passed on attempt 3!" in result.outlines
     assert "\ttest_moar_flaky failed on attempt 1! Retrying!" in result.outlines
     assert "\ttest_moar_flaky passed on attempt 2!" in result.outlines
+
+
+@xdist_test_marker
+def test_xdist_resources_properly_closed_server_side(testdir):
+    # TODO: This test works for the sockets opened in the main process,
+    #       but there is no way to catch them inside the workers
+    #       (or at least, the author of this test didn't find it)
+
+    testdir.makepyfile(
+        """
+        a = 0
+        b = 0
+
+        def test_flaky() -> None:
+            global a
+
+            a += 1
+            assert a == 3
+
+        def test_moar_flaky() -> None:
+            global b
+
+            b += 1
+            assert b == 2
+        """
+    )
+
+    # The test MUST be run in a subprocess because the warnings appear
+    # on pytest teardown
+    result = testdir.runpytest_subprocess("-n", "2", "--retries", "3", "-W", "error")
+
+    for line in result.errlines:
+        assert "ResourceWarning" not in line

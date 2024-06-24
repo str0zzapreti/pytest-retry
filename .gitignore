@@ -11,3 +11,5 @@ config.ini
 credentials.ini
 dist/
 venv/
+.vscode/
+.python-version

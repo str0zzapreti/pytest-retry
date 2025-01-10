@@ -5,7 +5,7 @@ from logging import LogRecord
 from traceback import format_exception
 from typing import Any, Generator, Optional
 from collections.abc import Iterable
-from pytest_retry.configs import Defaults, RETRY_OUTCOME
+from pytest_retry.configs import Defaults
 from pytest_retry.server import ReportHandler, OfflineReporter, ReportServer, ClientReporter
 from _pytest.terminal import TerminalReporter
 from _pytest.logging import caplog_records_key

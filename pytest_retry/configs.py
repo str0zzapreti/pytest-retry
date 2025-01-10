@@ -16,7 +16,7 @@ class _Defaults:
         RETRIES: 1,  # A flaky mark with 0 args should default to 1 retry.
         RETRY_DELAY: 0,
         CUMULATIVE_TIMING: False,
-        RETRY_OUTCOME: 'retried',  # The string to use for retry outcomes
+        RETRY_OUTCOME: "retried",  # The string to use for retry outcomes
     }
 
     def __init__(self) -> None:
@@ -43,9 +43,7 @@ class _Defaults:
         self._opts[RETRIES] = int(config.getini(RETRIES.lower()))
         self._opts[RETRY_DELAY] = float(config.getini(RETRY_DELAY.lower()))
         self._opts[CUMULATIVE_TIMING] = config.getini(CUMULATIVE_TIMING.lower())
-        retry_outcome = config.getini(RETRY_OUTCOME.lower())
-        if retry_outcome:
-            self._opts[RETRY_OUTCOME] = retry_outcome
+        self._opts[RETRY_OUTCOME] = config.getini(RETRY_OUTCOME.lower())
 
     def configure(self, config: pytest.Config) -> None:
         if config.getini("retries"):

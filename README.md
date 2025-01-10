@@ -1,17 +1,19 @@
 ![Tests](https://github.com/str0zzapreti/pytest-retry/actions/workflows/tests.yaml/badge.svg)
+
 # pytest-retry
 
 pytest-retry is a plugin for Pytest which adds the ability to retry flaky tests,
-thereby improving the consistency of the test suite results. 
+thereby improving the consistency of the test suite results.
 
 ## Requirements
 
 pytest-retry is designed for the latest versions of Python and Pytest. Python 3.9+
-and pytest 7.0.0+ are required. 
+and pytest 7.0.0+ are required.
 
 ## Installation
 
 Use pip to install pytest-retry:
+
 ```bash
 $ pip install pytest-retry
 ```
@@ -23,7 +25,7 @@ There are two main ways to use pytest-retry:
 ### 1. Global settings
 
 Once installed, pytest-retry adds new command line and ini config options for pytest.
-Run Pytest with the command line argument --retries in order to retry every test in 
+Run Pytest with the command line argument --retries in order to retry every test in
 the event of a failure. The following example will retry each failed up to two times
 before proceeding to the next test:
 
@@ -41,13 +43,15 @@ $ python -m pytest --retries 2 --retry-delay 5
 ```
 
 #### Advanced Options:
+
 There are two custom hooks provided for the purpose of setting global exception
 filters for your entire Pytest suite. `pytest_set_filtered_exceptions`
-and `pytest_set_excluded_exceptions`. You can define either of them in your 
-conftest.py file and return a list of exception types. Note: these hooks are 
+and `pytest_set_excluded_exceptions`. You can define either of them in your
+conftest.py file and return a list of exception types. Note: these hooks are
 mutually exclusive and cannot both be defined at the same time.
 
 Example:
+
 ```py
 def pytest_set_excluded_exceptions():
     """
@@ -57,17 +61,22 @@ def pytest_set_excluded_exceptions():
 ```
 
 There is a command line option to specify the test timing method, which can either
-be `overwrite` (default) or `cumulative`. With cumulative timing, the duration of 
+be `overwrite` (default) or `cumulative`. With cumulative timing, the duration of
 each test attempt is summed for the reported overall test duration. The default
 behavior simply reports the timing of the final attempt.
 
 ```bash
-$ python -m pytest --retries 2 --cumulative-timing 1
+$ python -m pytest --retries 2 --cumulative-timing 1 --retry-outcome rerun
 ```
 
 If you're not sure which to use, stick with the default `overwrite` method. This
 generally plays nicer with time-based test splitting algorithms and will result in
 more even splits.
+
+There is an option to define the outcome of the report that is generated, when combining
+with other tools such as pytest-html it expects the type of report to match a list of
+options, in the case of pytest-html it expects it to be "rerun" so you can define the
+output either by command line argument or in the config files defined below.
 
 Instead of command line arguments, you can set any of these config options in your
 pytest.ini, tox.ini, or pyproject.toml file. Any command line arguments will take
@@ -75,19 +84,23 @@ precedence over options specified in one of these config files. Here are some
 sample configs that you can copy into your project to get started:
 
 _pyproject.toml_
+
 ```toml
 [tool.pytest.ini_options]
 retries = 2
 retry_delay = 0.5
 cumulative_timing = false
+retry_outcome = rerun
 ```
 
 _config.ini/tox.ini_
+
 ```ini
 [pytest]
 retries = 2
 retry_delay = 0.5
 cumulative_timing = false
+retry_outcome = rerun
 ```
 
 ### 2. Pytest flaky mark
@@ -115,7 +128,7 @@ def test_unreliable_service():
 
 If you want to control filtered or excluded exceptions per-test, the flaky mark
 provides the `only_on` and `exclude` arguments which both take a list of exception
-types, including any custom types you may have defined for your project. Note that 
+types, including any custom types you may have defined for your project. Note that
 only one of these arguments may be used at a time.
 
 A test with a list of `only_on` exceptions will only be retried if it fails with
@@ -147,7 +160,7 @@ def test_only_flaky_on_some_systems():
 ```
 
 Finally, there is a flaky mark argument for the test timing method, which can either
-be `overwrite` (default) or `cumulative`. See **Command Line** > **Advanced Options** 
+be `overwrite` (default) or `cumulative`. See **Command Line** > **Advanced Options**
 for more information
 
 ```py
@@ -161,24 +174,24 @@ specified when running Pytest.
 
 ### Things to consider
 
-- **Currently, failing test fixtures are not retried.** In the future, flaky test setup 
-may be retried, although given the undesirability of flaky tests in general, flaky setup 
-should be avoided at all costs. Any failures during teardown will immediately halt
-further attempts so that they can be addressed immediately. Make sure your teardowns
-always work reliably regardless of the number of retries when using this plugin
+- **Currently, failing test fixtures are not retried.** In the future, flaky test setup
+  may be retried, although given the undesirability of flaky tests in general, flaky setup
+  should be avoided at all costs. Any failures during teardown will immediately halt
+  further attempts so that they can be addressed immediately. Make sure your teardowns
+  always work reliably regardless of the number of retries when using this plugin
 
-- When a flaky test is retried, the plugin runs teardown steps for the test as if it 
-had passed. This is to ensure that any partial state created by the test is cleaned up 
-before the next attempt so that subsequent attempts do not conflict with one another.
-Class and module fixtures are included in this teardown with the assumption that false
-test failures should be a rare occurrence and the performance hit from re-running 
-these potentially expensive fixtures is worth it to ensure clean initial test state. 
-With feedback, the option to not re-run class and module fixtures may be added, but 
-in general, these types of fixtures should be avoided for known flaky tests.
+- When a flaky test is retried, the plugin runs teardown steps for the test as if it
+  had passed. This is to ensure that any partial state created by the test is cleaned up
+  before the next attempt so that subsequent attempts do not conflict with one another.
+  Class and module fixtures are included in this teardown with the assumption that false
+  test failures should be a rare occurrence and the performance hit from re-running
+  these potentially expensive fixtures is worth it to ensure clean initial test state.
+  With feedback, the option to not re-run class and module fixtures may be added, but
+  in general, these types of fixtures should be avoided for known flaky tests.
 
 - Flaky tests are not sustainable. This plugin is designed as an easy short-term
-solution while a permanent fix is implemented. Use the reports generated by this plugin
-to identify issues with the tests or testing environment and resolve them.
+  solution while a permanent fix is implemented. Use the reports generated by this plugin
+  to identify issues with the tests or testing environment and resolve them.
 
 ## Reporting
 
@@ -187,7 +200,7 @@ update the reports as required. When a test is retried at least once, an R is pr
 to the live test output and the counter of retried tests is incremented by 1. After
 the test session has completed, an additional report is generated below the standard
 output which lists all of the tests which were retried, along with the exceptions
-that occurred during each failed attempt. 
+that occurred during each failed attempt.
 
 ```
 plugins: retry-1.1.0
@@ -217,6 +230,6 @@ retried and failed. Skipped, xfailed, and xpassed tests are never retried.
 Three pytest stash keys are available to import from the pytest_retry plugin:
 `attempts_key`, `outcome_key`, and `duration_key`. These keys are used by the plugin
 to store the number of attempts each item has undergone, whether the test passed or
-failed, and the total duration from setup to teardown, respectively. (If any stage of 
-setup, call, or teardown fails, a test is considered failed overall). These stash keys 
+failed, and the total duration from setup to teardown, respectively. (If any stage of
+setup, call, or teardown fails, a test is considered failed overall). These stash keys
 can be used to retrieve these reports for use in your own hooks or plugins.

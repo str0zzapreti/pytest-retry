@@ -226,7 +226,7 @@ def pytest_runtest_makereport(
 
         # If teardown passes, send report that the test is being retried
         if attempts == 1:
-            original_report.outcome = "retried"  # type: ignore
+            original_report.outcome = Defaults.RETRY_OUTCOME  # type: ignore
             hook.pytest_runtest_logreport(report=original_report)
             original_report.outcome = "failed"
         retry_manager.log_attempt(attempt=attempts, name=item.name, exc=call.excinfo, result=RETRY)
@@ -277,8 +277,8 @@ def pytest_terminal_summary(terminalreporter: TerminalReporter) -> None:
 def pytest_report_teststatus(
     report: pytest.TestReport,
 ) -> Optional[tuple[str, str, tuple[str, dict]]]:
-    if report.outcome == "retried":
-        return "retried", "R", ("RETRY", {"yellow": True})
+    if report.outcome == Defaults.RETRY_OUTCOME:
+        return Defaults.RETRY_OUTCOME, "R", ("RETRY", {"yellow": True})
     return None
 
 
@@ -317,6 +317,7 @@ def pytest_configure(config: pytest.Config) -> None:
 RETRIES_HELP_TEXT = "number of times to retry failed tests. Defaults to 0."
 DELAY_HELP_TEXT = "configure a delay (in seconds) between retries."
 TIMING_HELP_TEXT = "if True, retry duration will be included in overall reported test duration"
+RETRY_HELP_TEXT = "configure the outcome of retried tests. Defaults to 'retried'"
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -344,9 +345,17 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         type=bool,
         help=TIMING_HELP_TEXT,
     )
+    group.addoption(
+        "--retry-outcome",
+        action="store",
+        dest="retry_outcome",
+        type=str,
+        help=RETRY_HELP_TEXT,
+    )
     parser.addini("retries", RETRIES_HELP_TEXT, default=0, type="string")
     parser.addini("retry_delay", DELAY_HELP_TEXT, default=0, type="string")
     parser.addini("cumulative_timing", TIMING_HELP_TEXT, default=False, type="bool")
+    parser.addini("retry_outcome", RETRY_HELP_TEXT, default="retried")
 
 
 def pytest_addhooks(pluginmanager: pytest.PytestPluginManager) -> None:

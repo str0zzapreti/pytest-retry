@@ -66,17 +66,21 @@ each test attempt is summed for the reported overall test duration. The default
 behavior simply reports the timing of the final attempt.
 
 ```bash
-$ python -m pytest --retries 2 --cumulative-timing 1 --retry-outcome rerun
+$ python -m pytest --retries 2 --cumulative-timing 1
 ```
 
 If you're not sure which to use, stick with the default `overwrite` method. This
 generally plays nicer with time-based test splitting algorithms and will result in
 more even splits.
 
-There is an option to define the outcome of the report that is generated, when combining
-with other tools such as pytest-html it expects the type of report to match a list of
-options, in the case of pytest-html it expects it to be "rerun" so you can define the
-output either by command line argument or in the config files defined below.
+When using additional reporters or plugins besides command-line output such as `pytest-html`,
+this plugin's default reporting outcome of `retried` may not be compatible. The retry-outcome
+option allows you to specify a different string, for example: "rerun" (required by pytest-html)
+to maintain compatibility and avoid errors with your other reports.
+
+```bash
+$ python -m pytest --retry-outcome rerun
+```
 
 Instead of command line arguments, you can set any of these config options in your
 pytest.ini, tox.ini, or pyproject.toml file. Any command line arguments will take

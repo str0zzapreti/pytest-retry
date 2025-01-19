@@ -198,6 +198,23 @@ def test_retry_passes_after_temporary_test_failure(testdir):
     assert_outcomes(result, passed=1, retried=1)
 
 
+def test_custom_retry_outcome_for_reporting_compatibility(testdir):
+    testdir.makepyfile(
+        """
+        a = []
+        def test_eventually_passes():
+            a.append(1)
+            assert len(a) > 1
+        """
+    )
+    result = testdir.runpytest("--retries", "1", "--retry-outcome", "redo")
+
+    outcomes = result.parseoutcomes()
+    assert outcomes['passed'] == 1
+    assert outcomes['redo'] == 1
+    assert outcomes.get('retried', None) is None
+
+
 def test_retry_passes_after_temporary_test_failure_with_flaky_mark(testdir):
     testdir.makepyfile(
         """

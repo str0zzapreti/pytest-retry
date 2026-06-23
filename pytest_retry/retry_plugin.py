@@ -10,6 +10,11 @@ from pytest_retry.server import ReportHandler, OfflineReporter, ReportServer, Cl
 from _pytest.terminal import TerminalReporter
 from _pytest.logging import caplog_records_key
 
+try:
+    from _pytest.tmpdir import tmppath_result_key
+except ImportError:  # pytest < 7.3 doesn't expose the tmp_path retention stash key
+    tmppath_result_key = None  # type: ignore[assignment]
+
 
 outcome_key = pytest.StashKey[str]()
 attempts_key = pytest.StashKey[int]()
@@ -238,6 +243,16 @@ def pytest_runtest_makereport(
         call = pytest.CallInfo.from_call(lambda: hook.pytest_runtest_call(item=item), when="call")
         retry_report = pytest.TestReport.from_item_and_call(item, call)
         retry_manager.record_node_stats(retry_report)
+
+        # pytest's `tmp_path` fixture finalizer reads and then deletes
+        # `tmppath_result_key` from the item stash during teardown. The
+        # preliminary teardown above already triggered that deletion, and because
+        # this retry's setup/call run outside the normal makereport hook chain,
+        # nothing repopulates the key. Re-seed it (mirroring
+        # `_pytest.tmpdir.pytest_runtest_makereport`) so the post-retry teardown
+        # of the freshly created tmp_path doesn't raise KeyError.
+        if tmppath_result_key is not None:
+            item.stash.setdefault(tmppath_result_key, {})["call"] = retry_report.passed
 
         # Do the exception interaction step
         # (may not bother to support this since this is designed for automated runs, not debugging)

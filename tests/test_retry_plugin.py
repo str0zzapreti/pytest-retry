@@ -251,6 +251,28 @@ def test_retries_if_flaky_mark_is_applied_without_options(testdir):
     assert_outcomes(result, passed=1, retried=1)
 
 
+def test_tmp_path_teardown_succeeds_after_retry(testdir):
+    # Regression test: pytest's `tmp_path` fixture finalizer reads and then deletes
+    # `tmppath_result_key` from the item stash during teardown. The preliminary
+    # teardown performed before each retry triggers that deletion, and because the
+    # retry's setup/call run outside the normal makereport hook chain nothing
+    # repopulates the key, so the post-retry teardown used to raise
+    # `KeyError: <StashKey ...>` and report the (otherwise passing) test as an error.
+    testdir.makepyfile(
+        """
+        a = []
+
+        def test_eventually_passes(tmp_path):
+            (tmp_path / "probe.txt").write_text("data")
+            a.append(1)
+            assert len(a) > 2
+        """
+    )
+    result = testdir.runpytest("--retries", "2")
+
+    assert_outcomes(result, passed=1, retried=1, errors=0)
+
+
 def test_fixtures_are_retried_with_test(testdir):
     testdir.makepyfile(
         """
